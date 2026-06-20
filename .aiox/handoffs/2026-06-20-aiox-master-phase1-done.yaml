@@ -1,0 +1,36 @@
+# Handoff — aiox-master: Fase 1 concluída (backend)
+from_agent: aiox-master
+last_command: orchestrate-phase-1
+created_at: "2026-06-20"
+consumed: false
+
+project: tribo-hub
+phase: 1
+status: backend_concluido # falta frontend (login + /admin contas)
+
+done:
+  - "AuthModule: login (lockout 5x/30min), refresh, logout; bcrypt 12; JWT access(15m)/refresh(7d)"
+  - "Guards JwtAuthGuard + RolesGuard (RBAC super_admin/admin_tenant/aluno)"
+  - "TenantMiddleware: resolução de tenant por subdomínio"
+  - "ContasModule (super_admin): criar/listar/obter/atualizar/status + cria admin_tenant + assinatura base"
+  - "UsuariosModule: GET/PATCH /me"
+  - "ValidationPipe global + ThrottlerModule (5/min no login)"
+  - "Seed do super admin (superadmin@tribohub.com.br)"
+  - "Verificado e2e no Supabase: login, criar/listar conta, RBAC 403/401, isolamento por conta"
+
+pending:
+  - "Frontend: tela de login + /admin contas (consumir a API)"
+  - "Fluxo de convite por e-mail (accept-invite + Resend) — hoje a senha do admin é temporária retornada na criação"
+  - "Push para o GitHub (gate da Fase 0 ainda aberto)"
+
+notes:
+  - "Dados de teste no Supabase: conta 'Academia do Trafego' (infoprodutor) + admin joao@... — pode limpar"
+  - "tsconfig de app usa declaration:false (evita TS2742 com tipos do Prisma)"
+
+next:
+  recommended_agent: aiox-master
+  recommended_command: orchestrate
+  args: "continue --phase 1 (frontend) ou start --phase 2 (conteúdo)"
+  rationale: >
+    Completar o frontend da Fase 1 (login + /admin contas) OU avançar para a Fase 2
+    (motor de conteúdo bimodal). Gate da Fase 2: bucket de Storage no Supabase + Resend.

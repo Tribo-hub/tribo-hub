@@ -25,13 +25,21 @@ export default function Home() {
           T
         </div>
         <h1 className="text-4xl font-bold">Tribo Hub</h1>
-        <p className="text-slate-500 dark:text-slate-400">Fundação no ar — Fase 0 ✓</p>
-        <button
-          onClick={toggle}
-          className="px-5 py-2.5 rounded-xl bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold transition"
-        >
-          {dark ? '☀️ Modo claro' : '🌙 Modo escuro'}
-        </button>
+        <p className="text-slate-500 dark:text-slate-400">Fase 1 no ar — auth & contas ✓</p>
+        <div className="flex items-center justify-center gap-3">
+          <a
+            href="/login"
+            className="px-5 py-2.5 rounded-xl bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold transition"
+          >
+            Entrar
+          </a>
+          <button
+            onClick={toggle}
+            className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold transition"
+          >
+            {dark ? '☀️ Claro' : '🌙 Escuro'}
+          </button>
+        </div>
       </div>
     </main>
   );
