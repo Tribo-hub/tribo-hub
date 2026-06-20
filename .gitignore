@@ -1,0 +1,35 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Ambiente / segredos — NUNCA versionar
+.env
+.env.*
+!.env.example
+
+# Build / cache
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+
+# Prisma
+prisma/*.db
+
+# Certificados (Efí/Pix etc.) — NUNCA versionar
+certs/
+*.p12
+*.pem
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

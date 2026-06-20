@@ -1,0 +1,51 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
+import { z } from 'zod';
+
+// Carrega o .env da raiz do monorepo (fonte única de segredos)
+config({ path: resolve(__dirname, '../../../.env') });
+
+const schema = z.object({
+  // App / geral
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  APP_BASE_DOMAIN: z.string().default('tribohub.com.br'),
+  APP_URL: z.string().url().default('http://localhost:3000'),
+  API_URL: z.string().url().default('http://localhost:3333'),
+
+  // Banco (obrigatórios a partir da Fase 0)
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
+  DIRECT_URL: z.string().min(1, 'DIRECT_URL é obrigatório'),
+
+  // Segredos da aplicação (obrigatórios a partir da Fase 1)
+  JWT_ACCESS_SECRET: z.string().min(1),
+  JWT_REFRESH_SECRET: z.string().min(1),
+  JWT_ACCESS_EXPIRES: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES: z.string().default('7d'),
+  COOKIE_SECRET: z.string().min(1),
+  CRON_SECRET: z.string().optional(),
+  INTERNAL_API_KEY: z.string().optional(),
+
+  // Storage (Fase 2)
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().default('tribohub'),
+
+  // E-mail (Fase 1)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Tribo Hub <no-reply@tribohub.com.br>'),
+
+  // Integrações / cobrança (fases posteriores)
+  HOTMART_WEBHOOK_SECRET: z.string().optional(),
+  EFI_CLIENT_ID: z.string().optional(),
+  EFI_CLIENT_SECRET: z.string().optional(),
+});
+
+const parsed = schema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('❌ Variáveis de ambiente inválidas:\n', parsed.error.flatten().fieldErrors);
+  throw new Error('Configuração de ambiente inválida — verifique o arquivo .env');
+}
+
+export const env = parsed.data;
+export type Env = typeof env;

@@ -1,0 +1,20 @@
+{
+  "name": "tribo-hub",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.5.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @tribohub/db generate",
+    "db:push": "pnpm --filter @tribohub/db push",
+    "db:studio": "pnpm --filter @tribohub/db studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

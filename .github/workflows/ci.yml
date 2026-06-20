@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter @tribohub/db generate
+
+      - name: Build packages
+        run: |
+          pnpm --filter @tribohub/config build
+          pnpm --filter @tribohub/db build
+
+      - name: Build apps
+        run: |
+          pnpm --filter @tribohub/api build
+          pnpm --filter @tribohub/web build

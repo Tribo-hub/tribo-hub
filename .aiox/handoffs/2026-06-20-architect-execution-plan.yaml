@@ -1,0 +1,36 @@
+# Handoff artifact — Architect → orquestração de execução
+# Consumido pelo @aiox-master para iniciar o ciclo por fases.
+from_agent: architect
+last_command: create-execution-plan
+created_at: "2026-06-20"
+consumed: false
+
+project: tribo-hub
+prd_source: tribohub_especificacao_tecnica_v4.md
+data_model: schema.prisma
+ui_reference: tribohub_mockup_v2.html
+execution_plan: docs/tribohub-execution-plan.md
+
+summary: >
+  Plano de execução mestre criado. Faseamento 0→7 (MVP bimodal: corporativo + infoprodutor)
+  com DoD por fase e orquestração AIOX autônoma (pm→architect→po→sm→dev→qa→devops),
+  parando apenas em gates humanos (credenciais externas, aprovação visual, go-live).
+
+next:
+  recommended_agent: aiox-master
+  recommended_command: orchestrate
+  args: "start --phase 0"
+  rationale: >
+    Iniciar a Fase 0 (Fundação & Bootstrap). Gate humano da Fase 0: GitHub repo + Neon (DATABASE_URL).
+  alternatives:
+    - agent: pm
+      command: create-doc
+      args: "prd/phase-0"
+      rationale: "Formalizar o epic da Fase 0 antes do dev, se preferir um PRD por fase."
+
+gates:
+  phase_0: ["GitHub repo", "Supabase (DATABASE_URL + DIRECT_URL)"]
+  phase_2: ["Supabase Storage bucket", "Resend domain"]
+  phase_5: ["Hotmart conta de teste + webhook secret"]
+  phase_6: ["Efí conta + Client ID/Secret + certificado Pix"]
+  phase_7: ["domínio tribohub.com.br no Cloudflare", "aprovação de go-live"]

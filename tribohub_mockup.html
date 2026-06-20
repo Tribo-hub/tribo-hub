@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tribo Hub — Protótipo de Telas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          tribo: { 50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+<!-- ============ SELETOR DE TELAS (barra do protótipo) ============ -->
+<div class="sticky top-0 z-50 bg-slate-900 text-white shadow-lg">
+  <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center gap-2">
+    <div class="flex items-center gap-2 mr-3">
+      <div class="w-7 h-7 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div>
+      <span class="font-semibold">Tribo Hub <span class="text-slate-400 font-normal text-sm">· protótipo</span></span>
+    </div>
+    <span class="text-xs text-slate-400 mr-1 hidden sm:inline">Aluno /app:</span>
+    <button onclick="show('app-home',this)" class="nav-pill">Home</button>
+    <button onclick="show('app-trilha',this)" class="nav-pill">Trilha</button>
+    <button onclick="show('app-player',this)" class="nav-pill">Player</button>
+    <span class="text-xs text-slate-400 mx-1 hidden sm:inline">Produtor /painel:</span>
+    <button onclick="show('info-dash',this)" class="nav-pill">Dashboard</button>
+    <button onclick="show('info-conteudo',this)" class="nav-pill">Conteúdo</button>
+    <button onclick="show('info-matriculas',this)" class="nav-pill">Matrículas</button>
+    <span class="text-xs text-slate-400 mx-1 hidden sm:inline">Gestor:</span>
+    <button onclick="show('corp-dash',this)" class="nav-pill">Corporativo</button>
+    <span class="text-xs text-slate-400 mx-1 hidden sm:inline">Admin:</span>
+    <button onclick="show('admin-contas',this)" class="nav-pill">Contas</button>
+  </div>
+</div>
+<style>
+  .nav-pill { font-size: 13px; padding: 4px 10px; border-radius: 8px; background:#1e293b; color:#cbd5e1; }
+  .nav-pill:hover { background:#334155; color:#fff; }
+  .nav-pill.on { background:#7c3aed; color:#fff; }
+</style>
+
+<!-- ===================================================================== -->
+<!-- TELA 1 — ALUNO / HOME (área de membros white-label do infoprodutor)   -->
+<!-- ===================================================================== -->
+<section id="app-home" class="screen active">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/app</b> · Usuário final (Aluno) · Área de membros com marca do tenant <b>“Academia do Tráfego”</b>
+  </div>
+  <!-- topbar white-label -->
+  <header class="bg-white border-b">
+    <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-rose-600 grid place-items-center text-white font-bold">A</div>
+        <span class="font-bold text-slate-900">Academia do Tráfego</span>
+      </div>
+      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+        <a class="text-rose-600">Início</a><a>Meus cursos</a><a>Certificados</a>
+      </nav>
+      <div class="w-9 h-9 rounded-full bg-slate-200 grid place-items-center text-sm font-semibold">JS</div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 py-8 space-y-10">
+    <!-- continue de onde parou -->
+    <div class="rounded-2xl bg-gradient-to-r from-slate-900 to-tribo-800 text-white p-7 flex flex-col md:flex-row md:items-center gap-6">
+      <div class="flex-1">
+        <p class="text-xs uppercase tracking-wide text-tribo-200 mb-1">Continue de onde parou</p>
+        <h2 class="text-2xl font-bold">Tráfego Pago do Zero</h2>
+        <p class="text-slate-300 text-sm mt-1">Módulo 3 · Aula 2 — Estruturando campanhas de conversão</p>
+        <div class="mt-4 w-full md:w-80 bg-white/20 rounded-full h-2"><div class="bg-tribo-400 h-2 rounded-full" style="width:62%"></div></div>
+        <p class="text-xs text-slate-300 mt-1">62% concluído</p>
+      </div>
+      <button onclick="show('app-player')" class="bg-white text-slate-900 font-semibold px-6 py-3 rounded-xl hover:bg-slate-100">▶ Continuar</button>
+    </div>
+
+    <!-- meus cursos -->
+    <div>
+      <h3 class="text-lg font-bold mb-4">Meus cursos</h3>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div onclick="show('app-trilha')" class="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition">
+          <div class="h-32 bg-gradient-to-br from-rose-500 to-orange-400"></div>
+          <div class="p-4">
+            <h4 class="font-semibold">Tráfego Pago do Zero</h4>
+            <p class="text-xs text-slate-500 mt-1">5 módulos · 25 aulas</p>
+            <div class="mt-3 bg-slate-100 rounded-full h-1.5"><div class="bg-rose-500 h-1.5 rounded-full" style="width:62%"></div></div>
+            <p class="text-xs text-slate-400 mt-1">62% · acesso até 14/06/2027</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div class="h-32 bg-gradient-to-br from-tribo-500 to-indigo-400"></div>
+          <div class="p-4">
+            <h4 class="font-semibold">Copywriting para Anúncios</h4>
+            <p class="text-xs text-slate-500 mt-1">4 módulos · 18 aulas</p>
+            <div class="mt-3 bg-slate-100 rounded-full h-1.5"><div class="bg-tribo-500 h-1.5 rounded-full" style="width:100%"></div></div>
+            <p class="text-xs text-emerald-600 mt-1 font-medium">✓ Concluído · certificado disponível</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div class="h-32 bg-gradient-to-br from-emerald-500 to-teal-400"></div>
+          <div class="p-4">
+            <h4 class="font-semibold">Funis de Venda no WhatsApp</h4>
+            <p class="text-xs text-slate-500 mt-1">3 módulos · 12 aulas</p>
+            <div class="mt-3 bg-slate-100 rounded-full h-1.5"><div class="bg-emerald-500 h-1.5 rounded-full" style="width:0%"></div></div>
+            <p class="text-xs text-slate-400 mt-1">Não iniciado</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 2 — ALUNO / PÁGINA DA TRILHA                                      -->
+<!-- ===================================================================== -->
+<section id="app-trilha" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/app</b> · Aluno · Página da trilha (módulos, aulas e progresso)
+  </div>
+  <header class="bg-white border-b">
+    <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-rose-600 grid place-items-center text-white font-bold">A</div><span class="font-bold">Academia do Tráfego</span></div>
+      <button onclick="show('app-home')" class="text-sm text-slate-500 hover:text-slate-800">← Voltar</button>
+    </div>
+  </header>
+  <main class="max-w-4xl mx-auto px-5 py-8">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold">Tráfego Pago do Zero</h1>
+      <p class="text-slate-500 mt-1">Do primeiro pixel à primeira campanha lucrativa. 5 módulos, 25 aulas.</p>
+      <div class="mt-4 flex items-center gap-3">
+        <div class="flex-1 bg-slate-200 rounded-full h-2.5"><div class="bg-rose-500 h-2.5 rounded-full" style="width:62%"></div></div>
+        <span class="text-sm font-semibold text-slate-700">62%</span>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <!-- Módulo concluído -->
+      <div class="bg-white rounded-xl border">
+        <div class="px-5 py-3 flex items-center justify-between border-b bg-slate-50 rounded-t-xl">
+          <span class="font-semibold">Módulo 1 — Fundamentos</span>
+          <span class="text-xs text-emerald-600 font-medium">✓ 100%</span>
+        </div>
+        <ul class="divide-y text-sm">
+          <li class="px-5 py-3 flex items-center gap-3 text-slate-400"><span class="text-emerald-500">✓</span> 1.1 O que é tráfego pago <span class="ml-auto">4:30</span></li>
+          <li class="px-5 py-3 flex items-center gap-3 text-slate-400"><span class="text-emerald-500">✓</span> 1.2 Plataformas e onde anunciar <span class="ml-auto">6:10</span></li>
+        </ul>
+      </div>
+      <!-- Módulo atual -->
+      <div class="bg-white rounded-xl border-2 border-rose-200">
+        <div class="px-5 py-3 flex items-center justify-between border-b bg-rose-50 rounded-t-xl">
+          <span class="font-semibold">Módulo 3 — Campanhas de conversão</span>
+          <span class="text-xs text-rose-600 font-medium">Em andamento · 40%</span>
+        </div>
+        <ul class="divide-y text-sm">
+          <li class="px-5 py-3 flex items-center gap-3 text-slate-400"><span class="text-emerald-500">✓</span> 3.1 Objetivos de campanha <span class="ml-auto">5:20</span></li>
+          <li onclick="show('app-player')" class="px-5 py-3 flex items-center gap-3 cursor-pointer hover:bg-rose-50 font-medium text-rose-700">
+            <span>▶</span> 3.2 Estruturando campanhas de conversão
+            <span class="ml-auto bg-rose-600 text-white text-xs px-2 py-0.5 rounded">Continuar</span>
+          </li>
+          <li class="px-5 py-3 flex items-center gap-3"><span>○</span> 3.3 Públicos e segmentação <span class="ml-auto text-slate-400">7:45</span></li>
+        </ul>
+      </div>
+      <!-- Módulo bloqueado -->
+      <div class="bg-white rounded-xl border opacity-70">
+        <div class="px-5 py-3 flex items-center justify-between border-b bg-slate-50 rounded-t-xl">
+          <span class="font-semibold text-slate-500">Módulo 4 — Otimização e escala</span>
+          <span class="text-xs text-slate-400">🔒 Conclua o módulo anterior</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 3 — ALUNO / PLAYER                                                -->
+<!-- ===================================================================== -->
+<section id="app-player" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/app</b> · Aluno · Player de aula (vídeo, progresso, materiais, navegação)
+  </div>
+  <div class="bg-slate-900 text-slate-200 min-h-screen">
+    <header class="border-b border-slate-700">
+      <div class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <button onclick="show('app-trilha')" class="text-sm text-slate-400 hover:text-white">← Tráfego Pago do Zero</button>
+        <span class="text-xs text-slate-400">Módulo 3 · Aula 2 de 6</span>
+      </div>
+    </header>
+    <div class="max-w-6xl mx-auto px-5 py-6 grid lg:grid-cols-[1fr_320px] gap-6">
+      <div>
+        <div class="aspect-video bg-black rounded-xl grid place-items-center border border-slate-700">
+          <div class="w-16 h-16 rounded-full bg-tribo-600 grid place-items-center text-2xl">▶</div>
+        </div>
+        <div class="mt-2 bg-slate-700 rounded-full h-1.5"><div class="bg-tribo-500 h-1.5 rounded-full" style="width:78%"></div></div>
+        <p class="text-xs text-slate-500 mt-1">78% assistido — ao atingir 80% a aula é marcada como concluída automaticamente</p>
+
+        <h1 class="text-xl font-bold text-white mt-4">3.2 Estruturando campanhas de conversão</h1>
+        <p class="text-slate-400 text-sm mt-1">Trilha › Módulo 3 — Campanhas de conversão › Aula 2</p>
+        <div class="flex flex-wrap gap-3 mt-4">
+          <button class="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">✓ Marcar como concluída</button>
+          <button class="bg-slate-700 hover:bg-slate-600 text-sm px-4 py-2 rounded-lg">📄 Material de apoio (PDF)</button>
+          <button class="bg-slate-700 hover:bg-slate-600 text-sm px-4 py-2 rounded-lg">💬 Legendas</button>
+        </div>
+      </div>
+      <aside class="bg-slate-800 rounded-xl p-3 h-fit">
+        <p class="text-xs uppercase tracking-wide text-slate-400 px-2 mb-2">Aulas do módulo</p>
+        <ul class="space-y-1 text-sm">
+          <li class="px-3 py-2 rounded-lg flex gap-2 text-slate-400"><span class="text-emerald-500">✓</span> 3.1 Objetivos de campanha</li>
+          <li class="px-3 py-2 rounded-lg flex gap-2 bg-tribo-600/20 text-white font-medium"><span>▶</span> 3.2 Estruturando campanhas</li>
+          <li class="px-3 py-2 rounded-lg flex gap-2 text-slate-400"><span>○</span> 3.3 Públicos e segmentação</li>
+          <li class="px-3 py-2 rounded-lg flex gap-2 text-slate-400"><span>○</span> 3.4 Orçamento e lances</li>
+        </ul>
+        <button class="w-full mt-3 bg-white text-slate-900 font-semibold py-2 rounded-lg text-sm">Próxima aula →</button>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- LAYOUT /painel reutilizado via screens individuais                     -->
+<!-- TELA 4 — PRODUTOR / DASHBOARD (infoprodutor)                           -->
+<!-- ===================================================================== -->
+<section id="info-dash" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/painel</b> · Admin do tenant = <b>Produtor</b> (conta tipo <b>infoprodutor</b>)
+  </div>
+  <div class="flex min-h-screen">
+    <!-- sidebar -->
+    <aside class="w-60 bg-slate-900 text-slate-300 p-4 hidden md:block">
+      <div class="flex items-center gap-2 mb-6 text-white"><div class="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div><span class="font-semibold">Tribo Hub</span></div>
+      <p class="text-xs text-slate-500 mb-2">PRODUTOR</p>
+      <nav class="space-y-1 text-sm">
+        <a class="block px-3 py-2 rounded-lg bg-tribo-600 text-white">📊 Dashboard</a>
+        <a onclick="show('info-conteudo')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">🎬 Conteúdo</a>
+        <a onclick="show('info-matriculas')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">🎟️ Matrículas</a>
+        <a onclick="show('info-matriculas')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">🔌 Integrações</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">👥 Alunos</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">🎨 Marca</a>
+      </nav>
+    </aside>
+    <main class="flex-1 bg-slate-100 p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-bold">Dashboard</h1><p class="text-slate-500 text-sm">Academia do Tráfego · plano Growth</p></div>
+        <span class="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-medium">Hotmart conectada</span>
+      </div>
+      <!-- cards -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Alunos ativos</p><p class="text-3xl font-bold mt-1">1.284</p><p class="text-xs text-slate-400 mt-1">matrículas ativas (cobrança)</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Novos no mês</p><p class="text-3xl font-bold mt-1 text-emerald-600">+147</p><p class="text-xs text-slate-400 mt-1">via Hotmart</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Taxa de conclusão</p><p class="text-3xl font-bold mt-1">38%</p><p class="text-xs text-slate-400 mt-1">média dos cursos</p></div>
+        <div class="bg-white rounded-xl p-5 border border-amber-200"><p class="text-xs text-slate-500">Matrículas a expirar (30d)</p><p class="text-3xl font-bold mt-1 text-amber-600">62</p><p class="text-xs text-slate-400 mt-1">renovar ou prorrogar</p></div>
+      </div>
+      <div class="grid lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl p-5 border lg:col-span-2">
+          <p class="font-semibold mb-4">Novos alunos · últimos 30 dias</p>
+          <div class="flex items-end gap-1.5 h-40">
+            <div class="flex-1 bg-tribo-200 rounded-t" style="height:40%"></div><div class="flex-1 bg-tribo-300 rounded-t" style="height:55%"></div>
+            <div class="flex-1 bg-tribo-300 rounded-t" style="height:35%"></div><div class="flex-1 bg-tribo-400 rounded-t" style="height:70%"></div>
+            <div class="flex-1 bg-tribo-400 rounded-t" style="height:60%"></div><div class="flex-1 bg-tribo-500 rounded-t" style="height:85%"></div>
+            <div class="flex-1 bg-tribo-600 rounded-t" style="height:100%"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-5 border">
+          <p class="font-semibold mb-4">Cobrança deste mês</p>
+          <p class="text-sm text-slate-500">Plano base (até 1.000 alunos)</p>
+          <p class="text-lg font-semibold">R$ 297,00</p>
+          <p class="text-sm text-slate-500 mt-3">Excedente: 284 × R$ 0,90</p>
+          <p class="text-lg font-semibold">R$ 255,60</p>
+          <hr class="my-3"/>
+          <p class="text-sm text-slate-500">Total estimado</p>
+          <p class="text-2xl font-bold text-tribo-700">R$ 552,60</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 5 — PRODUTOR / EDITOR DE CONTEÚDO                                 -->
+<!-- ===================================================================== -->
+<section id="info-conteudo" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/painel</b> · Produtor cria o <b>próprio conteúdo</b> (Trilha → Módulo → Aula), isolado por conta
+  </div>
+  <div class="flex min-h-screen">
+    <aside class="w-60 bg-slate-900 text-slate-300 p-4 hidden md:block">
+      <div class="flex items-center gap-2 mb-6 text-white"><div class="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div><span class="font-semibold">Tribo Hub</span></div>
+      <p class="text-xs text-slate-500 mb-2">PRODUTOR</p>
+      <nav class="space-y-1 text-sm">
+        <a onclick="show('info-dash')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">📊 Dashboard</a>
+        <a class="block px-3 py-2 rounded-lg bg-tribo-600 text-white">🎬 Conteúdo</a>
+        <a onclick="show('info-matriculas')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">🎟️ Matrículas</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">👥 Alunos</a>
+      </nav>
+    </aside>
+    <main class="flex-1 bg-slate-100 p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Editar curso · Tráfego Pago do Zero</h1>
+        <button class="bg-tribo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">+ Novo módulo</button>
+      </div>
+      <div class="grid lg:grid-cols-[1fr_360px] gap-6">
+        <div class="space-y-3">
+          <div class="bg-white rounded-xl border">
+            <div class="px-5 py-3 flex items-center justify-between border-b">
+              <span class="font-semibold">⠿ Módulo 3 — Campanhas de conversão</span>
+              <span class="text-xs text-slate-400">3 aulas · publicado</span>
+            </div>
+            <ul class="divide-y text-sm">
+              <li class="px-5 py-3 flex items-center gap-3"><span class="text-slate-400">⠿</span> 3.1 Objetivos de campanha <span class="text-xs bg-slate-100 px-2 py-0.5 rounded ml-2">youtube</span><span class="ml-auto text-slate-400">✎ 🗑</span></li>
+              <li class="px-5 py-3 flex items-center gap-3 bg-tribo-50"><span class="text-slate-400">⠿</span> 3.2 Estruturando campanhas <span class="text-xs bg-slate-200 px-2 py-0.5 rounded ml-2">upload</span><span class="ml-auto text-slate-400">✎ 🗑</span></li>
+              <li class="px-5 py-3 flex items-center gap-3"><span class="text-slate-400">⠿</span> 3.3 Públicos e segmentação <span class="text-xs bg-slate-100 px-2 py-0.5 rounded ml-2">vimeo</span><span class="ml-auto text-slate-400">✎ 🗑</span></li>
+            </ul>
+            <button class="px-5 py-3 text-sm text-tribo-600 font-medium">+ Adicionar aula</button>
+          </div>
+        </div>
+        <!-- editor de aula -->
+        <div class="bg-white rounded-xl border p-5 h-fit">
+          <p class="font-semibold mb-4">Aula 3.2</p>
+          <label class="text-xs text-slate-500">Título</label>
+          <input class="w-full border rounded-lg px-3 py-2 text-sm mb-3" value="Estruturando campanhas de conversão"/>
+          <label class="text-xs text-slate-500">Tipo de vídeo</label>
+          <div class="flex gap-2 my-1 mb-3 text-sm">
+            <span class="px-3 py-1 rounded-lg bg-tribo-600 text-white">Upload (MP4)</span>
+            <span class="px-3 py-1 rounded-lg bg-slate-100">YouTube</span>
+            <span class="px-3 py-1 rounded-lg bg-slate-100">Vimeo</span>
+          </div>
+          <div class="border-2 border-dashed rounded-lg p-6 text-center text-sm text-slate-400 mb-3">⬆ Arraste o vídeo ou clique para enviar</div>
+          <label class="text-xs text-slate-500">Material de apoio (PDF/PPTX)</label>
+          <div class="border rounded-lg px-3 py-2 text-sm text-slate-500 mb-4">campanhas-checklist.pdf ✓</div>
+          <button class="w-full bg-tribo-600 text-white font-semibold py-2 rounded-lg text-sm">Salvar aula</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 6 — PRODUTOR / MATRÍCULAS + INTEGRAÇÃO                            -->
+<!-- ===================================================================== -->
+<section id="info-matriculas" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/painel</b> · Integração por <b>webhook</b> + matrículas (o medidor da cobrança)
+  </div>
+  <div class="flex min-h-screen">
+    <aside class="w-60 bg-slate-900 text-slate-300 p-4 hidden md:block">
+      <div class="flex items-center gap-2 mb-6 text-white"><div class="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div><span class="font-semibold">Tribo Hub</span></div>
+      <p class="text-xs text-slate-500 mb-2">PRODUTOR</p>
+      <nav class="space-y-1 text-sm">
+        <a onclick="show('info-dash')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">📊 Dashboard</a>
+        <a onclick="show('info-conteudo')" class="block px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">🎬 Conteúdo</a>
+        <a class="block px-3 py-2 rounded-lg bg-tribo-600 text-white">🎟️ Matrículas</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">👥 Alunos</a>
+      </nav>
+    </aside>
+    <main class="flex-1 bg-slate-100 p-6 space-y-6">
+      <!-- integração + ofertas -->
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl border p-5">
+          <p class="font-semibold mb-3">Integrações</p>
+          <div class="flex items-center justify-between py-2 border-b"><span class="text-sm">🟠 Hotmart</span><span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Conectada</span></div>
+          <div class="flex items-center justify-between py-2 border-b"><span class="text-sm">🔵 Eduzz</span><button class="text-xs text-tribo-600">Conectar</button></div>
+          <div class="flex items-center justify-between py-2"><span class="text-sm">🟢 Kiwify</span><button class="text-xs text-tribo-600">Conectar</button></div>
+        </div>
+        <div class="bg-white rounded-xl border p-5">
+          <p class="font-semibold mb-3">Ofertas (produto externo → curso)</p>
+          <div class="text-sm space-y-2">
+            <div class="flex items-center justify-between"><span>HM #4471 → <b>Tráfego Pago</b></span><span class="text-xs text-slate-500">prazo: 12 meses</span></div>
+            <div class="flex items-center justify-between"><span>HM #5520 → <b>Copywriting</b></span><span class="text-xs text-slate-500">vitalício</span></div>
+          </div>
+          <button class="mt-3 text-sm text-tribo-600 font-medium">+ Nova oferta</button>
+        </div>
+      </div>
+      <!-- tabela matriculas -->
+      <div class="bg-white rounded-xl border">
+        <div class="px-5 py-3 flex items-center justify-between border-b">
+          <p class="font-semibold">Matrículas</p>
+          <div class="flex gap-2 text-xs"><span class="px-3 py-1 rounded-lg bg-tribo-600 text-white">Todas</span><span class="px-3 py-1 rounded-lg bg-slate-100">Ativas</span><span class="px-3 py-1 rounded-lg bg-slate-100">A expirar</span></div>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="text-left text-slate-500 bg-slate-50"><tr><th class="px-5 py-2 font-medium">Aluno</th><th class="px-5 py-2 font-medium">Curso</th><th class="px-5 py-2 font-medium">Origem</th><th class="px-5 py-2 font-medium">Expira</th><th class="px-5 py-2 font-medium">Status</th><th class="px-5 py-2 font-medium">Ações</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-5 py-3">João Silva</td><td class="px-5 py-3">Tráfego Pago</td><td class="px-5 py-3 text-slate-500">compra · Hotmart</td><td class="px-5 py-3">14/06/2027</td><td class="px-5 py-3"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">ativa</span></td><td class="px-5 py-3 text-tribo-600 text-xs">Prorrogar · Inativar</td></tr>
+            <tr class="bg-amber-50"><td class="px-5 py-3">Maria Souza</td><td class="px-5 py-3">Tráfego Pago</td><td class="px-5 py-3 text-slate-500">compra · Hotmart</td><td class="px-5 py-3 text-amber-700">28/06/2026</td><td class="px-5 py-3"><span class="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">a expirar</span></td><td class="px-5 py-3 text-tribo-600 text-xs">Prorrogar · Inativar</td></tr>
+            <tr><td class="px-5 py-3">Pedro Lima</td><td class="px-5 py-3">Copywriting</td><td class="px-5 py-3 text-slate-500">cortesia · manual</td><td class="px-5 py-3 text-slate-400">vitalício</td><td class="px-5 py-3"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">ativa</span></td><td class="px-5 py-3 text-tribo-600 text-xs">Inativar</td></tr>
+            <tr><td class="px-5 py-3">Ana Costa</td><td class="px-5 py-3">Tráfego Pago</td><td class="px-5 py-3 text-slate-500">compra · Hotmart</td><td class="px-5 py-3 text-slate-400">—</td><td class="px-5 py-3"><span class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full">inativa (reembolso)</span></td><td class="px-5 py-3 text-tribo-600 text-xs">Reativar</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 7 — GESTOR / DASHBOARD CORPORATIVO                                -->
+<!-- ===================================================================== -->
+<section id="corp-dash" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/painel</b> · Admin do tenant = <b>Gestor</b> (conta tipo <b>corporativo</b>) · conteúdo do catálogo da plataforma
+  </div>
+  <div class="flex min-h-screen">
+    <aside class="w-60 bg-slate-900 text-slate-300 p-4 hidden md:block">
+      <div class="flex items-center gap-2 mb-6 text-white"><div class="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div><span class="font-semibold">Tribo Hub</span></div>
+      <p class="text-xs text-slate-500 mb-2">GESTOR · Acme Ltda</p>
+      <nav class="space-y-1 text-sm">
+        <a class="block px-3 py-2 rounded-lg bg-tribo-600 text-white">📊 Dashboard</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">👥 Equipe</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">📚 Trilhas</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">🎨 Marca</a>
+      </nav>
+    </aside>
+    <main class="flex-1 bg-slate-100 p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-bold">Dashboard da equipe</h1><p class="text-slate-500 text-sm">Acme Ltda · plano Growth · 142/150 assentos</p></div>
+        <button class="bg-tribo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">+ Convidar colaborador</button>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Colaboradores</p><p class="text-3xl font-bold mt-1">142</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Ativos (7 dias)</p><p class="text-3xl font-bold mt-1 text-emerald-600">98</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Engajamento</p><p class="text-3xl font-bold mt-1">69%</p><p class="text-xs text-emerald-600 mt-1">meta &gt; 50% ✓</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Trilhas concluídas</p><p class="text-3xl font-bold mt-1">54</p></div>
+      </div>
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl p-5 border">
+          <p class="font-semibold mb-4">Ranking de colaboradores</p>
+          <ol class="space-y-3 text-sm">
+            <li class="flex items-center gap-3"><span class="w-6 h-6 grid place-items-center rounded-full bg-amber-100 text-amber-700 font-bold text-xs">1</span> Carla Mendes <span class="ml-auto text-slate-500">23 aulas</span></li>
+            <li class="flex items-center gap-3"><span class="w-6 h-6 grid place-items-center rounded-full bg-slate-100 font-bold text-xs">2</span> Rafael Dias <span class="ml-auto text-slate-500">21 aulas</span></li>
+            <li class="flex items-center gap-3"><span class="w-6 h-6 grid place-items-center rounded-full bg-slate-100 font-bold text-xs">3</span> Bruna Alves <span class="ml-auto text-slate-500">19 aulas</span></li>
+          </ol>
+        </div>
+        <div class="bg-white rounded-xl p-5 border">
+          <p class="font-semibold mb-1">Colaboradores inativos</p>
+          <p class="text-xs text-slate-500 mb-4">sem acesso há mais de 7 dias · 12 pessoas</p>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span>Lucas Pereira</span><span class="text-slate-400">há 11 dias</span></div>
+            <div class="flex justify-between"><span>Fernanda Rocha</span><span class="text-slate-400">há 9 dias</span></div>
+          </div>
+          <button class="mt-4 text-sm text-tribo-600 font-medium">Exportar e-mails →</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- TELA 8 — SUPER ADMIN / CONTAS                                          -->
+<!-- ===================================================================== -->
+<section id="admin-contas" class="screen">
+  <div class="bg-amber-50 text-amber-800 text-xs text-center py-1.5 border-b border-amber-200">
+    Instância <b>/admin</b> · <b>Super Admin</b> (você) · gestão de todas as contas e cobrança
+  </div>
+  <div class="flex min-h-screen">
+    <aside class="w-60 bg-slate-950 text-slate-300 p-4 hidden md:block">
+      <div class="flex items-center gap-2 mb-6 text-white"><div class="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold">T</div><span class="font-semibold">Tribo Hub</span></div>
+      <p class="text-xs text-slate-500 mb-2">SUPER ADMIN</p>
+      <nav class="space-y-1 text-sm">
+        <a class="block px-3 py-2 rounded-lg bg-tribo-600 text-white">🏢 Contas</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">📚 Catálogo (plataforma)</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">💰 Faturamento</a>
+        <a class="block px-3 py-2 rounded-lg hover:bg-slate-800">📈 Métricas globais</a>
+      </nav>
+    </aside>
+    <main class="flex-1 bg-slate-100 p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Contas (tenants)</h1>
+        <button class="bg-tribo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">+ Nova conta</button>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Contas ativas</p><p class="text-3xl font-bold mt-1">37</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">MRR estimado</p><p class="text-3xl font-bold mt-1 text-emerald-600">R$ 41,2k</p></div>
+        <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500">Infoprodutor / Corporativo</p><p class="text-3xl font-bold mt-1">24 / 13</p></div>
+      </div>
+      <div class="bg-white rounded-xl border overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="text-left text-slate-500 bg-slate-50"><tr><th class="px-5 py-3 font-medium">Conta</th><th class="px-5 py-3 font-medium">Tipo</th><th class="px-5 py-3 font-medium">Cobrança</th><th class="px-5 py-3 font-medium">Uso</th><th class="px-5 py-3 font-medium">Status</th></tr></thead>
+          <tbody class="divide-y">
+            <tr>
+              <td class="px-5 py-3"><b>Academia do Tráfego</b><br><span class="text-xs text-slate-400">academiadotrafego.com.br</span></td>
+              <td class="px-5 py-3"><span class="bg-tribo-100 text-tribo-700 text-xs px-2 py-0.5 rounded-full">infoprodutor</span></td>
+              <td class="px-5 py-3">R$ 297 + R$ 0,90/excedente</td>
+              <td class="px-5 py-3">1.284 alunos ativos</td>
+              <td class="px-5 py-3"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">ativa</span></td>
+            </tr>
+            <tr>
+              <td class="px-5 py-3"><b>Acme Ltda</b><br><span class="text-xs text-slate-400">acme.tribohub.com.br</span></td>
+              <td class="px-5 py-3"><span class="bg-sky-100 text-sky-700 text-xs px-2 py-0.5 rounded-full">corporativo</span></td>
+              <td class="px-5 py-3">Plano Growth (assentos)</td>
+              <td class="px-5 py-3">142 / 150 assentos</td>
+              <td class="px-5 py-3"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">ativa</span></td>
+            </tr>
+            <tr>
+              <td class="px-5 py-3"><b>Mentoria Black</b><br><span class="text-xs text-slate-400">area.mentoriablack.com</span></td>
+              <td class="px-5 py-3"><span class="bg-tribo-100 text-tribo-700 text-xs px-2 py-0.5 rounded-full">infoprodutor</span></td>
+              <td class="px-5 py-3">R$ 497 + R$ 0,70/excedente</td>
+              <td class="px-5 py-3">3.910 alunos ativos</td>
+              <td class="px-5 py-3"><span class="bg-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-full">suspensa</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</section>
+
+<script>
+  function show(id, el){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.nav-pill').forEach(p=>p.classList.remove('on'));
+    if(el) el.classList.add('on');
+    window.scrollTo(0,0);
+  }
+  // marca o primeiro pill como ativo
+  document.querySelector('.nav-pill').classList.add('on');
+</script>
+</body>
+</html>
