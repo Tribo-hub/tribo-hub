@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { ContasModule } from './contas/contas.module';
+import { ConteudoModule } from './conteudo/conteudo.module';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -17,6 +18,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     AuthModule,
     UsuariosModule,
     ContasModule,
+    ConteudoModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
