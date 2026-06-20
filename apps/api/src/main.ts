@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { env } from '@tribohub/config';
@@ -9,6 +10,9 @@ async function bootstrap() {
   app.use(helmet());
   app.enableCors({ origin: [env.APP_URL], credentials: true });
   app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
+  );
 
   const port = Number(new URL(env.API_URL).port || 3333);
   await app.listen(port);

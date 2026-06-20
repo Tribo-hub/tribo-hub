@@ -1,0 +1,28 @@
+# Handoff — aiox-master: Fase 0 concluída
+from_agent: aiox-master
+last_command: orchestrate-phase-0
+created_at: "2026-06-20"
+consumed: false
+
+project: tribo-hub
+phase: 0
+status: concluida_parcial # falta apenas o push para o GitHub (gate humano)
+
+done:
+  - "Monorepo pnpm (apps/web, apps/api, packages/db, packages/config) — instalado e buildando"
+  - "Supabase: schema Prisma (15 tabelas + enums) sincronizado via db push"
+  - "API NestJS com health-check (testa o banco); build OK"
+  - "Web Next.js com landing + tema claro/escuro (marca Tribo); build OK"
+  - "CI de build (.github/workflows/ci.yml)"
+  - "git init + commit inicial (main); .env protegido pelo .gitignore"
+
+pending_gate:
+  - "Criar repositório no GitHub e configurar o remote para dar push (habilita a CI)"
+
+next:
+  recommended_agent: aiox-master
+  recommended_command: orchestrate
+  args: "start --phase 1"
+  rationale: >
+    Fase 1 (Multi-tenant, Auth & Contas). Pode iniciar mesmo antes do push;
+    o push do GitHub é só para versionar/CI. Demais credenciais (Resend) entram no fluxo da Fase 1.
