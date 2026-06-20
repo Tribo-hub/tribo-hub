@@ -26,7 +26,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, senha }),
       });
       setToken(res.accessToken);
-      router.push('/admin/contas');
+      router.push(res.usuario.role === 'super_admin' ? '/admin/contas' : '/painel/conteudo');
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha no login');
     } finally {
