@@ -1,0 +1,22 @@
+# Controle explícito do build no Railway/Nixpacks.
+# Fixa Node 20 e instala o pnpm direto (sem corepack), evitando o bug
+# ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING (corepack 0.24.1 + Node 24 + pnpm 11).
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = [
+  "corepack disable || true",
+  "npm install -g pnpm@11.5.1",
+  "pnpm install --frozen-lockfile",
+]
+
+[phases.build]
+cmds = [
+  "pnpm --filter @tribohub/db generate",
+  "pnpm --filter @tribohub/config build",
+  "pnpm --filter @tribohub/db build",
+  "pnpm --filter @tribohub/api build",
+]
