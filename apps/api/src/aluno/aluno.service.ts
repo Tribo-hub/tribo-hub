@@ -1,6 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ProprietarioConteudo, StatusMatricula, TipoConta } from '@tribohub/db';
+import { env } from '@tribohub/config';
 import { randomUUID } from 'crypto';
+import PDFDocument from 'pdfkit';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -206,6 +208,76 @@ export class AlunoService {
       where: { usuarioId: user.sub },
       include: { trilha: { select: { titulo: true } } },
       orderBy: { emitidoEm: 'desc' },
+    });
+  }
+
+  async baixarCertificado(user: AuthUser, certId: string) {
+    const cert = await this.prisma.certificado.findUnique({
+      where: { id: certId },
+      include: {
+        usuario: { select: { nome: true } },
+        trilha: { select: { titulo: true } },
+        conta: { select: { nome: true } },
+      },
+    });
+    if (!cert || cert.usuarioId !== user.sub) throw new NotFoundException('Certificado não encontrado');
+
+    let path = cert.pdfUrl;
+    if (!path) {
+      const buffer = await this.gerarPdf({
+        aluno: cert.usuario.nome,
+        trilha: cert.trilha.titulo,
+        emissor: cert.conta.nome,
+        codigo: cert.codigoVerificacao,
+        data: cert.emitidoEm,
+      });
+      path = `${cert.contaId}/certificados/${cert.codigoVerificacao}.pdf`;
+      await this.storage.uploadBuffer(path, buffer, 'application/pdf');
+      await this.prisma.certificado.update({ where: { id: certId }, data: { pdfUrl: path } });
+    }
+    return this.storage.urlDeDownload(path);
+  }
+
+  private gerarPdf(d: {
+    aluno: string;
+    trilha: string;
+    emissor: string;
+    codigo: string;
+    data: Date;
+  }): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c: Buffer) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const w = doc.page.width;
+      const hgt = doc.page.height;
+      doc.lineWidth(3).strokeColor('#7c3aed').rect(20, 20, w - 40, hgt - 40).stroke();
+      doc.moveDown(2);
+      doc.fontSize(34).fillColor('#1e293b').text('CERTIFICADO', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fontSize(14).fillColor('#64748b').text('de conclusão', { align: 'center' });
+      doc.moveDown(2);
+      doc.fontSize(16).fillColor('#334155').text('Certificamos que', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(26).fillColor('#7c3aed').text(d.aluno, { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(16).fillColor('#334155').text('concluiu a trilha', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fontSize(20).fillColor('#1e293b').text(d.trilha, { align: 'center' });
+      doc.moveDown(2);
+      doc
+        .fontSize(12)
+        .fillColor('#64748b')
+        .text(`Emitido por ${d.emissor} em ${d.data.toLocaleDateString('pt-BR')}`, { align: 'center' });
+      doc.moveDown(0.4);
+      doc
+        .fontSize(10)
+        .fillColor('#94a3b8')
+        .text(`Verificação: ${env.APP_URL}/verificar/${d.codigo}`, { align: 'center' });
+      doc.end();
     });
   }
 

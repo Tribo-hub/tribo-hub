@@ -39,6 +39,15 @@ export default function CertificadosPage() {
     carregar();
   }, [router, carregar]);
 
+  async function baixar(id: string) {
+    try {
+      const res = await api<{ url: string }>(`/me/certificados/${id}/download`);
+      window.open(res.url, '_blank');
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
       <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
@@ -68,12 +77,20 @@ export default function CertificadosPage() {
                     Emitido em {new Date(c.emitidoEm).toLocaleDateString('pt-BR')} · código {c.codigoVerificacao.slice(0, 8)}
                   </p>
                 </div>
-                <a
-                  href={`/verificar/${c.codigoVerificacao}`}
-                  className="text-sm text-tribo-600 dark:text-tribo-400 hover:underline"
-                >
-                  verificar
-                </a>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => baixar(c.id)}
+                    className="text-sm bg-tribo-600 hover:bg-tribo-700 text-white font-semibold px-3 py-1.5 rounded-lg"
+                  >
+                    Baixar PDF
+                  </button>
+                  <a
+                    href={`/verificar/${c.codigoVerificacao}`}
+                    className="text-sm text-tribo-600 dark:text-tribo-400 hover:underline"
+                  >
+                    verificar
+                  </a>
+                </div>
               </div>
             ))}
           </div>

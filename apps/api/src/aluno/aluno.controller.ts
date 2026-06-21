@@ -42,4 +42,9 @@ export class AlunoController {
   meusCertificados(@CurrentUser() u: AuthUser) {
     return this.aluno.meusCertificados(u);
   }
+
+  @Get('me/certificados/:id/download')
+  baixarCertificado(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.aluno.baixarCertificado(u, id);
+  }
 }

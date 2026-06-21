@@ -25,6 +25,15 @@ export class StorageService {
     return { path, token: data.token, signedUrl: data.signedUrl };
   }
 
+  // Sobe um buffer gerado no servidor (ex.: PDF de certificado).
+  async uploadBuffer(path: string, buffer: Buffer, contentType: string) {
+    const { error } = await this.client.storage
+      .from(this.bucket)
+      .upload(path, buffer, { contentType, upsert: true });
+    if (error) throw new InternalServerErrorException(error.message);
+    return { path };
+  }
+
   // Gera uma URL assinada temporária para leitura (bucket privado).
   async urlDeDownload(path: string, expiraEmSegundos = 3600) {
     const { data, error } = await this.client.storage
