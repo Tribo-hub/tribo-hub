@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -34,6 +35,14 @@ export class BillingController {
   @Roles(Role.super_admin)
   fechar(@Body('competencia') competencia?: string) {
     return this.billing.fecharTodas(competencia || competenciaAtual());
+  }
+
+  // Super Admin: emite cobrança Pix (Efí) de uma fatura
+  @Post('admin/faturamento/:id/cobrar')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  cobrar(@Param('id') id: string) {
+    return this.billing.cobrar(id);
   }
 
   // Produtor/Gestor: prévia da própria fatura do mês

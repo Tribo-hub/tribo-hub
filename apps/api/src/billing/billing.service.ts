@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TipoConta } from '@tribohub/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { EfiService } from './efi.service';
 
 export function competenciaAtual(): string {
   const d = new Date();
@@ -9,7 +10,23 @@ export function competenciaAtual(): string {
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly efi: EfiService,
+  ) {}
+
+  // Emite uma cobrança Pix (Efí) para a fatura informada.
+  async cobrar(faturaId: string) {
+    const fatura = await this.prisma.faturaPlataforma.findUnique({
+      where: { id: faturaId },
+      include: { conta: { select: { nome: true } } },
+    });
+    if (!fatura) throw new NotFoundException('Fatura não encontrada');
+    return this.efi.criarCobrancaPix({
+      valor: Number(fatura.valorTotal),
+      descricao: `Tribo Hub - fatura ${fatura.competencia} - ${fatura.conta.nome}`,
+    });
+  }
 
   // Calcula (sem salvar) a fatura de uma conta para a competência.
   async calcular(contaId: string) {

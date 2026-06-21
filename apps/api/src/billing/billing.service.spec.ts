@@ -16,7 +16,7 @@ describe('BillingService.calcular', () => {
         ]),
       },
     } as any;
-    const r = await new BillingService(prisma).calcular('c1');
+    const r = await new BillingService(prisma, {} as any).calcular('c1');
     expect(r.alunosAtivos).toBe(4);
     expect(r.valorExcedente).toBeCloseTo(1.8); // (4-2)*0.9
     expect(r.valorTotal).toBeCloseTo(298.8);
@@ -29,7 +29,7 @@ describe('BillingService.calcular', () => {
       },
       usuario: { count: jest.fn().mockResolvedValue(12) },
     } as any;
-    const r = await new BillingService(prisma).calcular('c1');
+    const r = await new BillingService(prisma, {} as any).calcular('c1');
     expect(r.assentosUsados).toBe(12);
     expect(r.valorExcedente).toBe(0);
     expect(r.valorTotal).toBe(199);

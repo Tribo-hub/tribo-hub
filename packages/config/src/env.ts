@@ -40,6 +40,9 @@ const schema = z.object({
   HOTMART_WEBHOOK_SECRET: z.string().optional(),
   EFI_CLIENT_ID: z.string().optional(),
   EFI_CLIENT_SECRET: z.string().optional(),
+  EFI_PIX_KEY: z.string().optional(),
+  EFI_CERTIFICATE_PATH: z.string().optional(),
+  EFI_SANDBOX: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
