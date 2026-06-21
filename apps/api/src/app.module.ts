@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
+import { CorporativoModule } from './corporativo/corporativo.module';
 import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { StorageModule } from './storage/storage.module';
@@ -25,6 +26,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     StorageModule,
     AlunoModule,
     InfoprodutorModule,
+    CorporativoModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

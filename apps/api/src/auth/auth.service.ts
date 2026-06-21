@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -94,6 +96,24 @@ export class AuthService {
     const user = await this.prisma.usuario.findUnique({ where: { id: payload.sub } });
     if (!user || !user.ativo) throw new UnauthorizedException('Usuário inválido');
     return this.emitirTokens(user.id, user.role, user.contaId);
+  }
+
+  async aceitarConvite(token: string, senha: string) {
+    const convite = await this.prisma.inviteToken.findUnique({ where: { token } });
+    if (!convite || convite.usado || convite.expiraEm < new Date()) {
+      throw new BadRequestException('Convite inválido ou expirado');
+    }
+    const user = await this.prisma.usuario.findFirst({
+      where: { email: convite.email.toLowerCase(), contaId: convite.contaId },
+    });
+    if (!user) throw new NotFoundException('Usuário do convite não encontrado');
+
+    const senhaHash = await AuthService.hashSenha(senha);
+    await this.prisma.$transaction([
+      this.prisma.usuario.update({ where: { id: user.id }, data: { senhaHash, ativo: true } }),
+      this.prisma.inviteToken.update({ where: { id: convite.id }, data: { usado: true } }),
+    ]);
+    return { ok: true };
   }
 
   private async emitirTokens(sub: string, role: string, contaId: string | null) {

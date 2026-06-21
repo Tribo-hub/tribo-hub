@@ -19,3 +19,12 @@ export class RefreshDto {
   @IsString()
   refreshToken!: string;
 }
+
+export class AcceptInviteDto {
+  @IsString()
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  senha!: string;
+}

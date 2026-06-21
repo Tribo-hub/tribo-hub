@@ -16,6 +16,7 @@ export class UsuariosService {
         contaId: true,
         avatarUrl: true,
         ultimoAcesso: true,
+        conta: { select: { tipoConta: true, nome: true } },
       },
     });
     if (!user) throw new NotFoundException('Usuário não encontrado');

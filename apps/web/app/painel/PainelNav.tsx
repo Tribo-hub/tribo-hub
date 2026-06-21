@@ -2,17 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { clearToken } from '../../lib/api';
+import { useEffect, useState } from 'react';
+import { api, clearToken } from '../../lib/api';
 
-const ITENS = [
+const INFO = [
   { href: '/painel/conteudo', label: 'Conteúdo' },
   { href: '/painel/ofertas', label: 'Ofertas & Integração' },
   { href: '/painel/matriculas', label: 'Matrículas' },
+];
+const CORP = [
+  { href: '/painel/dashboard', label: 'Dashboard' },
+  { href: '/painel/equipe', label: 'Equipe' },
 ];
 
 export function PainelNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [itens, setItens] = useState<{ href: string; label: string }[]>([]);
+
+  useEffect(() => {
+    api<{ conta?: { tipoConta: string } }>('/me')
+      .then((m) => setItens(m.conta?.tipoConta === 'corporativo' ? CORP : INFO))
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
       <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
@@ -22,7 +35,7 @@ export function PainelNav() {
             <span className="font-semibold hidden sm:inline">Tribo Hub</span>
           </div>
           <nav className="flex items-center gap-4 text-sm">
-            {ITENS.map((i) => (
+            {itens.map((i) => (
               <Link
                 key={i.href}
                 href={i.href}

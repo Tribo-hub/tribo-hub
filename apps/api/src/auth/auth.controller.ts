@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto } from './dto/login.dto';
+import { AcceptInviteDto, LoginDto, RefreshDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -19,6 +19,12 @@ export class AuthController {
   @HttpCode(200)
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
+  }
+
+  @Post('accept-invite')
+  @HttpCode(200)
+  aceitarConvite(@Body() dto: AcceptInviteDto) {
+    return this.auth.aceitarConvite(dto.token, dto.senha);
   }
 
   @Post('logout')
