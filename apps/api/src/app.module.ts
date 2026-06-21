@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AlunoModule } from './aluno/aluno.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { ContasModule } from './contas/contas.module';
@@ -21,6 +22,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     ContasModule,
     ConteudoModule,
     StorageModule,
+    AlunoModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
