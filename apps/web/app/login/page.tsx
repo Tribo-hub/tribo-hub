@@ -13,8 +13,15 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [tenant, setTenant] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
+
+  function destino(role: string) {
+    if (role === 'super_admin') return '/admin/contas';
+    if (role === 'admin_tenant') return '/painel/conteudo';
+    return '/app';
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,10 +30,10 @@ export default function LoginPage() {
     try {
       const res = await api<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify({ email, senha, ...(tenant ? { tenant } : {}) }),
       });
       setToken(res.accessToken);
-      router.push(res.usuario.role === 'super_admin' ? '/admin/contas' : '/painel/conteudo');
+      router.push(destino(res.usuario.role));
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha no login');
     } finally {
@@ -71,6 +78,17 @@ export default function LoginPage() {
             required
             className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
           />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 dark:text-slate-400">Conta (subdomínio) — opcional</label>
+          <input
+            type="text"
+            value={tenant}
+            onChange={(e) => setTenant(e.target.value)}
+            placeholder="ex.: academia-do-trafego"
+            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+          />
+          <p className="text-[11px] text-slate-400 mt-1">Alunos/gestores: informe a conta (em produção vem do endereço).</p>
         </div>
         <button
           type="submit"

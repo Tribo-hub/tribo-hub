@@ -11,7 +11,8 @@ export class AuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   login(@Body() dto: LoginDto, @Req() req: any) {
-    return this.auth.login(dto.email, dto.senha, req.tenantSlug ?? null);
+    // subdomínio (produção) tem prioridade; tenant no corpo é fallback p/ dev
+    return this.auth.login(dto.email, dto.senha, req.tenantSlug ?? dto.tenant ?? null);
   }
 
   @Post('refresh')
