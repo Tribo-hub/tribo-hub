@@ -8,6 +8,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
 import { HealthController } from './health/health.controller';
+import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { StorageModule } from './storage/storage.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -23,6 +24,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     ConteudoModule,
     StorageModule,
     AlunoModule,
+    InfoprodutorModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
