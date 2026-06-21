@@ -1,15 +1,17 @@
-# Controle explícito do build no Railway/Nixpacks.
-# Fixa Node 20 e instala o pnpm direto (sem corepack), evitando o bug
-# ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING (corepack 0.24.1 + Node 24 + pnpm 11).
+# Build no Railway/Nixpacks.
+# Node 22 (satisfaz o engine do pnpm 11) + corepack ATUALIZADO (corrige o bug
+# ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING do corepack 0.24.1). O corepack gerencia
+# o pnpm (shim no PATH), então as fases de build encontram o pnpm normalmente.
 providers = ["node"]
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
 cmds = [
-  "corepack disable || true",
-  "npm install -g pnpm@11.5.1",
+  "npm install -g corepack@latest",
+  "corepack enable",
+  "corepack prepare pnpm@11.5.1 --activate",
   "pnpm install --frozen-lockfile",
 ]
 
