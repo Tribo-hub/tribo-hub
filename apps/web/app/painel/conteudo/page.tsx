@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { PainelNav } from '../PainelNav';
 
 interface Trilha {
   id: string;
@@ -59,23 +60,7 @@ export default function ConteudoPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-tribo-600 grid place-items-center text-white text-sm font-bold">T</div>
-            <span className="font-semibold">Tribo Hub · Conteúdo</span>
-          </div>
-          <button
-            onClick={() => {
-              clearToken();
-              router.replace('/login');
-            }}
-            className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white"
-          >
-            Sair
-          </button>
-        </div>
-      </header>
+      <PainelNav />
 
       <div className="max-w-5xl mx-auto px-5 py-8 grid lg:grid-cols-[1fr_320px] gap-6">
         <section>

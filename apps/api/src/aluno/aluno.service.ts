@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ProprietarioConteudo, TipoConta } from '@tribohub/db';
+import { ProprietarioConteudo, StatusMatricula, TipoConta } from '@tribohub/db';
 import { randomUUID } from 'crypto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,12 +23,22 @@ export class AlunoService {
       // corporativo consome o catálogo da plataforma
       return { publicado: true, deletedAt: null, proprietarioTipo: ProprietarioConteudo.plataforma };
     }
-    // infoprodutor consome o conteúdo da própria conta
+    // infoprodutor: acesso somente às trilhas com matrícula ATIVA e não vencida
+    const mats = await this.prisma.matricula.findMany({
+      where: {
+        usuarioId: user.sub,
+        contaId: user.contaId!,
+        status: StatusMatricula.ativa,
+        OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }],
+      },
+      select: { trilhaId: true },
+    });
     return {
       publicado: true,
       deletedAt: null,
       proprietarioTipo: ProprietarioConteudo.tenant,
       contaId: user.contaId,
+      id: { in: mats.map((m) => m.trilhaId) },
     };
   }
 
