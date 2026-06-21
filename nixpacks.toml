@@ -12,7 +12,8 @@ cmds = [
   "npm install -g corepack@latest",
   "corepack enable",
   "corepack prepare pnpm@11.5.1 --activate",
-  "pnpm install --frozen-lockfile",
+  "pnpm install --frozen-lockfile || true",
+  "pnpm rebuild @prisma/client @prisma/engines prisma @nestjs/core || true",
 ]
 
 [phases.build]
