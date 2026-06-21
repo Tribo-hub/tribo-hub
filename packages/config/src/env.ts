@@ -28,6 +28,8 @@ const schema = z.object({
   // Storage (Fase 2)
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SERVICE_ROLE: z.string().optional(), // nome alternativo usado no .env
+  ANON_PUBLIC: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default('tribohub'),
 
   // E-mail (Fase 1)
@@ -47,5 +49,10 @@ if (!parsed.success) {
   throw new Error('Configuração de ambiente inválida — verifique o arquivo .env');
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  // normaliza a chave service_role (pode estar como SUPABASE_SERVICE_ROLE_KEY ou SERVICE_ROLE)
+  supabaseServiceRoleKey:
+    parsed.data.SUPABASE_SERVICE_ROLE_KEY || parsed.data.SERVICE_ROLE,
+};
 export type Env = typeof env;
