@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pnpm --filter @tribohub/db generate && pnpm --filter @tribohub/config build && pnpm --filter @tribohub/db build && pnpm --filter @tribohub/api build"
+  },
+  "deploy": {
+    "startCommand": "node apps/api/dist/main.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

@@ -14,10 +14,11 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
 
-  const port = Number(new URL(env.API_URL).port || 3333);
-  await app.listen(port);
+  // Railway/host injeta PORT; em dev cai para a porta do API_URL (3333)
+  const port = Number(process.env.PORT) || Number(new URL(env.API_URL).port || 3333);
+  await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console
-  console.log(`🚀 API Tribo Hub rodando em ${env.API_URL}/api`);
+  console.log(`🚀 API Tribo Hub ouvindo na porta ${port}`);
 }
 
 bootstrap();
