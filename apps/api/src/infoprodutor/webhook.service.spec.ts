@@ -35,6 +35,8 @@ const info = {
   upsertMatricula: jest.fn().mockResolvedValue({}),
 } as any;
 
+const email = { acessoLiberado: jest.fn().mockResolvedValue({}) } as any;
+
 describe('WebhookService.hotmart', () => {
   beforeEach(() => {
     info.encontrarOuCriarAluno.mockClear();
@@ -42,19 +44,19 @@ describe('WebhookService.hotmart', () => {
   });
 
   it('rejeita hottok inválido', async () => {
-    await expect(new WebhookService(mkPrisma(), info).hotmart('c1', 'errado', payload)).rejects.toThrow();
+    await expect(new WebhookService(mkPrisma(), info, email).hotmart('c1', 'errado', payload)).rejects.toThrow();
   });
 
   it('evento duplicado retorna { duplicate: true }', async () => {
     const prisma = mkPrisma({
       webhookEvent: { findUnique: jest.fn().mockResolvedValue({ id: 'x' }), create: jest.fn(), update: jest.fn() },
     });
-    const r = await new WebhookService(prisma, info).hotmart('c1', 'segredo', payload);
+    const r = await new WebhookService(prisma, info, email).hotmart('c1', 'segredo', payload);
     expect(r).toEqual({ duplicate: true });
   });
 
   it('compra aprovada libera acesso (cria matrícula)', async () => {
-    const r = await new WebhookService(mkPrisma(), info).hotmart('c1', 'segredo', payload);
+    const r = await new WebhookService(mkPrisma(), info, email).hotmart('c1', 'segredo', payload);
     expect(r.resultado).toBe('acesso_liberado');
     expect(info.upsertMatricula).toHaveBeenCalled();
   });
@@ -62,7 +64,7 @@ describe('WebhookService.hotmart', () => {
   it('reembolso revoga acesso', async () => {
     const refund = { ...payload, event: 'PURCHASE_REFUNDED' };
     const prisma = mkPrisma();
-    const r = await new WebhookService(prisma, info).hotmart('c1', 'segredo', refund);
+    const r = await new WebhookService(prisma, info, email).hotmart('c1', 'segredo', refund);
     expect(r.resultado).toBe('acesso_revogado');
     expect(prisma.matricula.updateMany).toHaveBeenCalled();
   });

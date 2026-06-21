@@ -9,6 +9,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
 import { CorporativoModule } from './corporativo/corporativo.module';
+import { EmailModule } from './email/email.module';
 import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { StorageModule } from './storage/storage.module';
@@ -19,6 +20,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
   imports: [
     JwtModule.register({ global: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    EmailModule,
     PrismaModule,
     AuthModule,
     UsuariosModule,

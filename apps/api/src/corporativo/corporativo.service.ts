@@ -8,13 +8,17 @@ import { TipoConta } from '@tribohub/db';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, randomUUID } from 'crypto';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SETE_DIAS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class CorporativoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   // ---------- Colaboradores ----------
   async convidar(contaId: string, nome: string, email: string) {
@@ -49,7 +53,9 @@ export class CorporativoService {
       data: { email: emailNorm, contaId, role: 'aluno', token, expiraEm: new Date(Date.now() + SETE_DIAS) },
     });
 
-    // TODO(Resend): enviar e-mail com link de ativação. Em dev, devolvemos o token.
+    const conta = await this.prisma.conta.findUnique({ where: { id: contaId }, select: { nome: true } });
+    await this.email.convite(emailNorm, nome, conta?.nome ?? 'sua empresa', token).catch(() => {});
+
     return {
       usuario: { id: usuario.id, nome: usuario.nome, email: emailNorm },
       conviteToken: token,

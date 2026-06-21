@@ -4,6 +4,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { StatusMatricula, StatusTransacao, TipoConta } from '@tribohub/db';
+import { randomUUID } from 'crypto';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { InfoprodutorService } from './infoprodutor.service';
 
@@ -22,6 +24,7 @@ export class WebhookService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly info: InfoprodutorService,
+    private readonly email: EmailService,
   ) {}
 
   async hotmart(contaId: string, hottok: string | undefined, body: any) {
@@ -61,6 +64,9 @@ export class WebhookService {
         : null;
 
       if (oferta && email && EVENTOS_LIBERA.includes(evento)) {
+        const existente = await this.prisma.usuario.findFirst({
+          where: { email: email.toLowerCase(), contaId },
+        });
         const aluno = await this.info.encontrarOuCriarAluno(contaId, email, nome);
         const trans = await this.prisma.transacao.upsert({
           where: { codigoTransacaoExterno: transacao },
@@ -81,6 +87,22 @@ export class WebhookService {
             ? null
             : new Date(Date.now() + (oferta.duracaoAcessoDias ?? 365) * 86400000);
         await this.info.upsertMatricula(contaId, aluno.id, oferta.trilhaId, 'compra', expira, trans.id);
+
+        // e-mail de acesso: comprador novo recebe link p/ definir senha
+        let tokenAtivacao: string | null = null;
+        if (!existente) {
+          tokenAtivacao = randomUUID();
+          await this.prisma.inviteToken.create({
+            data: {
+              email: email.toLowerCase(),
+              contaId,
+              role: 'aluno',
+              token: tokenAtivacao,
+              expiraEm: new Date(Date.now() + 30 * 86400000),
+            },
+          });
+        }
+        await this.email.acessoLiberado(email, nome, oferta.nome, tokenAtivacao).catch(() => {});
         resultado = 'acesso_liberado';
       } else if (oferta && email && EVENTOS_REVOGA.includes(evento)) {
         const aluno = await this.prisma.usuario.findFirst({
