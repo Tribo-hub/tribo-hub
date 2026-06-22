@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
@@ -52,4 +53,30 @@ export class UpdateContaDto {
   @IsOptional()
   @IsString()
   corPrimaria?: string;
+}
+
+export class UpdateAssinaturaDto {
+  @IsOptional()
+  @IsString()
+  plano?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  valorBase?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limiteUsuarios?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  alunosIncluidos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  valorPorExcedente?: number;
 }

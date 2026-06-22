@@ -6,6 +6,7 @@ import {
   Headers,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -43,6 +44,13 @@ export class BillingController {
   @Roles(Role.super_admin)
   cobrar(@Param('id') id: string) {
     return this.billing.cobrar(id);
+  }
+
+  @Patch('admin/faturamento/:id/marcar-paga')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  marcarPaga(@Param('id') id: string) {
+    return this.billing.marcarPaga(id);
   }
 
   // Produtor/Gestor: prévia da própria fatura do mês

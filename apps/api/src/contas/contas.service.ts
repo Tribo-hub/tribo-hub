@@ -3,7 +3,7 @@ import { Role, TipoCobranca, TipoConta } from '@tribohub/db';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateContaDto, UpdateContaDto } from './dto/create-conta.dto';
+import { CreateContaDto, UpdateAssinaturaDto, UpdateContaDto } from './dto/create-conta.dto';
 
 function slugify(texto: string): string {
   return texto
@@ -114,6 +114,28 @@ export class ContasService {
   async atualizar(id: string, dto: UpdateContaDto) {
     await this.obter(id);
     return this.prisma.conta.update({ where: { id }, data: dto });
+  }
+
+  listarUsuarios(contaId: string) {
+    return this.prisma.usuario.findMany({
+      where: { contaId },
+      select: { id: true, nome: true, email: true, role: true, ativo: true, ultimoAcesso: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async atualizarAssinatura(id: string, dto: UpdateAssinaturaDto) {
+    await this.obter(id);
+    return this.prisma.assinaturaPlataforma.update({
+      where: { contaId: id },
+      data: {
+        plano: dto.plano,
+        valorBase: dto.valorBase,
+        limiteUsuarios: dto.limiteUsuarios,
+        alunosIncluidos: dto.alunosIncluidos,
+        valorPorExcedente: dto.valorPorExcedente,
+      },
+    });
   }
 
   async definirStatus(id: string, ativo: boolean) {

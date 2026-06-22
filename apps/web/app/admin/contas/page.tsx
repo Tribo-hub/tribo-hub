@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
@@ -96,9 +97,10 @@ export default function ContasPage() {
             <div className="w-7 h-7 rounded-lg bg-tribo-600 grid place-items-center text-white text-sm font-bold">T</div>
             <span className="font-semibold">Tribo Hub · Super Admin</span>
           </div>
-          <button onClick={sair} className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white">
-            Sair
-          </button>
+          <div className="flex items-center gap-4 text-sm">
+            <Link href="/admin/faturamento" className="text-slate-500 hover:text-slate-800 dark:hover:text-white">Faturamento</Link>
+            <button onClick={sair} className="text-slate-500 hover:text-slate-800 dark:hover:text-white">Sair</button>
+          </div>
         </div>
       </header>
 
@@ -114,7 +116,11 @@ export default function ContasPage() {
           ) : (
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
               {contas.map((c) => (
-                <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+                <Link
+                  key={c.id}
+                  href={`/admin/contas/detalhe?id=${c.id}`}
+                  className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                >
                   <div>
                     <p className="font-medium">{c.nome}</p>
                     <p className="text-xs text-slate-500">
@@ -133,7 +139,7 @@ export default function ContasPage() {
                     </span>
                     <p className="text-xs text-slate-400 mt-1">{c.assinatura?.plano}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

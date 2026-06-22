@@ -13,7 +13,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ContasService } from './contas.service';
-import { CreateContaDto, UpdateContaDto } from './dto/create-conta.dto';
+import { CreateContaDto, UpdateAssinaturaDto, UpdateContaDto } from './dto/create-conta.dto';
 
 @Controller('admin/contas')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,6 +42,16 @@ export class ContasController {
   @Get(':id')
   obter(@Param('id') id: string) {
     return this.contas.obter(id);
+  }
+
+  @Get(':id/usuarios')
+  usuarios(@Param('id') id: string) {
+    return this.contas.listarUsuarios(id);
+  }
+
+  @Patch(':id/assinatura')
+  atualizarAssinatura(@Param('id') id: string, @Body() dto: UpdateAssinaturaDto) {
+    return this.contas.atualizarAssinatura(id, dto);
   }
 
   @Patch(':id')

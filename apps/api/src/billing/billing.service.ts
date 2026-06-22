@@ -22,9 +22,24 @@ export class BillingService {
       include: { conta: { select: { nome: true } } },
     });
     if (!fatura) throw new NotFoundException('Fatura não encontrada');
-    return this.efi.criarCobrancaPix({
+    const cob = await this.efi.criarCobrancaPix({
       valor: Number(fatura.valorTotal),
       descricao: `Tribo Hub - fatura ${fatura.competencia} - ${fatura.conta.nome}`,
+    });
+    await this.prisma.faturaPlataforma.update({
+      where: { id: faturaId },
+      data: { txid: cob.txid, pixCopiaECola: cob.pixCopiaECola },
+    });
+    return cob;
+  }
+
+  // Marca uma fatura como paga (registro manual pelo super admin).
+  async marcarPaga(faturaId: string) {
+    const fatura = await this.prisma.faturaPlataforma.findUnique({ where: { id: faturaId } });
+    if (!fatura) throw new NotFoundException('Fatura não encontrada');
+    return this.prisma.faturaPlataforma.update({
+      where: { id: faturaId },
+      data: { status: 'paga', pagoEm: new Date() },
     });
   }
 
@@ -72,6 +87,10 @@ export class BillingService {
 
   // Calcula e grava a fatura (idempotente por conta+competência).
   async fecharFatura(contaId: string, competencia: string) {
+    const existente = await this.prisma.faturaPlataforma.findUnique({
+      where: { contaId_competencia: { contaId, competencia } },
+    });
+    if (existente?.status === 'paga') return existente; // não recalcula fatura já paga
     const c = await this.calcular(contaId);
     return this.prisma.faturaPlataforma.upsert({
       where: { contaId_competencia: { contaId, competencia } },

@@ -427,15 +427,25 @@ model FaturaPlataforma {
   competencia    String // "YYYY-MM"
   alunosAtivos   Int? // infoprodutor
   assentosUsados Int? // corporativo
-  valorBase      Decimal  @db.Decimal(12, 2)
-  valorExcedente Decimal  @default(0) @db.Decimal(12, 2)
-  valorTotal     Decimal  @db.Decimal(12, 2)
+  valorBase      Decimal      @db.Decimal(12, 2)
+  valorExcedente Decimal      @default(0) @db.Decimal(12, 2)
+  valorTotal     Decimal      @db.Decimal(12, 2)
+  status         StatusFatura @default(pendente)
+  pagoEm         DateTime?
+  txid           String? // id da cobrança Pix na Efí
+  pixCopiaECola  String?
   fechadaEm      DateTime
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   conta Conta @relation(fields: [contaId], references: [id])
 
   @@unique([contaId, competencia])
   @@index([contaId])
   @@map("faturas_plataforma")
+}
+
+enum StatusFatura {
+  pendente
+  paga
+  cancelada
 }
