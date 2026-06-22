@@ -72,7 +72,7 @@ export default function AppHome() {
 
         {continuar && (
           <Link
-            href={`/app/trilhas/${continuar.id}`}
+            href={`/app/trilhas/ver?id=${continuar.id}`}
             className="block rounded-2xl bg-gradient-to-r from-slate-900 to-tribo-800 text-white p-6"
           >
             <p className="text-xs uppercase tracking-wide text-tribo-200">Continue de onde parou</p>
@@ -95,7 +95,7 @@ export default function AppHome() {
               {trilhas.map((t) => (
                 <Link
                   key={t.id}
-                  href={`/app/trilhas/${t.id}`}
+                  href={`/app/trilhas/ver?id=${t.id}`}
                   className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition"
                 >
                   <div className="h-28 bg-gradient-to-br from-tribo-500 to-indigo-400" />

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
 import { embed } from '../../../../lib/video';
@@ -29,13 +29,17 @@ interface Trilha {
 
 export default function TrilhaAluno() {
   const router = useRouter();
-  const id = String(useParams().id);
+  const [id, setId] = useState('');
+  useEffect(() => {
+    setId(new URLSearchParams(window.location.search).get('id') ?? '');
+  }, []);
   const [trilha, setTrilha] = useState<Trilha | null>(null);
   const [aulaId, setAulaId] = useState<string | null>(null);
   const [erro, setErro] = useState('');
   const [parabens, setParabens] = useState(false);
 
   const carregar = useCallback(async () => {
+    if (!id) return;
     try {
       const t = await api<Trilha>(`/app/trilhas/${id}`);
       setTrilha(t);

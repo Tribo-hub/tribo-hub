@@ -75,7 +75,7 @@ export default function ConteudoPage() {
               {trilhas.map((t) => (
                 <Link
                   key={t.id}
-                  href={`/painel/conteudo/${t.id}`}
+                  href={`/painel/conteudo/editar?id=${t.id}`}
                   className="block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-3 hover:shadow-sm"
                 >
                   <div className="flex items-center justify-between">

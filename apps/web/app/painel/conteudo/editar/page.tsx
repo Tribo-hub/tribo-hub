@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
 
@@ -28,13 +28,16 @@ interface Trilha {
 
 export default function TrilhaDetalhePage() {
   const router = useRouter();
-  const params = useParams();
-  const id = String(params.id);
+  const [id, setId] = useState('');
+  useEffect(() => {
+    setId(new URLSearchParams(window.location.search).get('id') ?? '');
+  }, []);
   const [trilha, setTrilha] = useState<Trilha | null>(null);
   const [erro, setErro] = useState('');
   const [novoModulo, setNovoModulo] = useState('');
 
   const carregar = useCallback(async () => {
+    if (!id) return;
     try {
       setTrilha(await api<Trilha>(`/painel/trilhas/${id}`));
       setErro('');
