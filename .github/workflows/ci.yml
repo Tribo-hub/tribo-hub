@@ -11,6 +11,13 @@ jobs:
     env:
       # URL usada no build estático do front (placeholder de CI)
       NEXT_PUBLIC_API_URL: https://tribohub-production.up.railway.app/api
+      # valores DUMMY só para o CI: o @tribohub/config (zod) valida estas vars ao importar
+      # (usado nos testes) e o prisma validate precisa resolver os env(). Não conectam em nada.
+      DATABASE_URL: postgresql://u:p@localhost:5432/db
+      DIRECT_URL: postgresql://u:p@localhost:5432/db
+      JWT_ACCESS_SECRET: ci-dummy-access
+      JWT_REFRESH_SECRET: ci-dummy-refresh
+      COOKIE_SECRET: ci-dummy-cookie
     steps:
       - uses: actions/checkout@v4
 
