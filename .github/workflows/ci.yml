@@ -22,8 +22,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # pnpm 11 sai com ERR_PNPM_IGNORED_BUILDS nos scripts de prisma/@nestjs;
+      # tolera o install e roda os build scripts explicitamente (igual ao Railway).
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile || true
+
+      - name: Rebuild build-script deps
+        run: pnpm rebuild @prisma/client @prisma/engines prisma @nestjs/core
 
       - name: Prisma generate
         run: pnpm --filter @tribohub/db generate
