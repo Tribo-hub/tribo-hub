@@ -61,6 +61,32 @@ export class BillingController {
     return this.billing.calcular(u.contaId!);
   }
 
+  // Validação do webhook: a Efí faz uma requisição na URL base ao registrar — precisa responder 2xx.
+  @Get('webhooks/efi')
+  @HttpCode(200)
+  efiPing() {
+    return { ok: true };
+  }
+
+  @Get('webhooks/efi/pix')
+  @HttpCode(200)
+  efiPingPix() {
+    return { ok: true };
+  }
+
+  // Webhook da Efí: confirma pagamento Pix automaticamente (público; autenticidade por mTLS na Efí).
+  @Post('webhooks/efi')
+  @HttpCode(200)
+  efiWebhookBase(@Body() body: { pix?: Array<{ txid?: string }> }) {
+    return this.billing.processarWebhookEfi(body);
+  }
+
+  @Post('webhooks/efi/pix')
+  @HttpCode(200)
+  efiWebhook(@Body() body: { pix?: Array<{ txid?: string }> }) {
+    return this.billing.processarWebhookEfi(body);
+  }
+
   // Cron mensal protegido por segredo
   @Post('internal/faturamento/fechar')
   @HttpCode(200)

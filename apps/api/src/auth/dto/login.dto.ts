@@ -28,3 +28,37 @@ export class AcceptInviteDto {
   @MinLength(8)
   senha!: string;
 }
+
+export class SignupDto {
+  @IsString()
+  nome!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  senha!: string;
+
+  @IsOptional()
+  @IsString()
+  tenant?: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  tenant?: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  senha!: string;
+}

@@ -3,9 +3,15 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
-import { PainelNav } from '../PainelNav';
+import { Shell } from '../../../components/Shell';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
+
+const PLATAFORMAS: { key: string; label: string; auth: 'header' | 'query'; secretLabel: string }[] = [
+  { key: 'hotmart', label: 'Hotmart', auth: 'header', secretLabel: 'hottok / segredo do webhook' },
+  { key: 'kiwify', label: 'Kiwify', auth: 'query', secretLabel: 'token / segredo do webhook' },
+  { key: 'eduzz', label: 'Eduzz', auth: 'query', secretLabel: 'token / segredo do webhook' },
+];
 
 interface Trilha { id: string; titulo: string }
 interface Oferta {
@@ -22,8 +28,8 @@ export default function OfertasPage() {
   const [contaId, setContaId] = useState('');
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
-  const [integrado, setIntegrado] = useState(false);
-  const [secret, setSecret] = useState('');
+  const [integracoes, setIntegracoes] = useState<string[]>([]);
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState('');
   const [form, setForm] = useState({ trilhaId: '', nome: '', codigoProdutoExterno: '', tipoAcesso: 'prazo', duracaoAcessoDias: 365 });
 
@@ -34,7 +40,7 @@ export default function OfertasPage() {
       setTrilhas(await api<Trilha[]>('/painel/trilhas'));
       setOfertas(await api<Oferta[]>('/painel/ofertas'));
       const integ = await api<{ plataforma: string }[]>('/painel/integracoes');
-      setIntegrado(integ.some((i) => i.plataforma === 'hotmart'));
+      setIntegracoes(integ.map((i) => i.plataforma));
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         clearToken();
@@ -48,14 +54,21 @@ export default function OfertasPage() {
     carregar();
   }, [router, carregar]);
 
-  async function salvarSecret(e: React.FormEvent) {
-    e.preventDefault();
+  async function salvarSecret(plataforma: string) {
+    const webhookSecret = secrets[plataforma];
+    if (!webhookSecret) { setMsg('Informe o segredo antes de salvar.'); return; }
     try {
-      await api('/painel/integracoes', { method: 'PUT', body: JSON.stringify({ plataforma: 'hotmart', webhookSecret: secret }) });
-      setMsg('Integração Hotmart salva.');
-      setSecret('');
+      await api('/painel/integracoes', { method: 'PUT', body: JSON.stringify({ plataforma, webhookSecret }) });
+      setMsg(`Integração ${plataforma} salva.`);
+      setSecrets((s) => ({ ...s, [plataforma]: '' }));
       await carregar();
     } catch (err) { setMsg(err instanceof Error ? err.message : 'Erro'); }
+  }
+
+  function webhookUrl(plataforma: string, auth: 'header' | 'query') {
+    if (!contaId) return '...';
+    const base = `${API_BASE}/webhooks/${plataforma}/${contaId}`;
+    return auth === 'query' ? `${base}?token=${secrets[plataforma] || 'SEGREDO'}` : base;
   }
 
   async function criarOferta(e: React.FormEvent) {
@@ -67,29 +80,43 @@ export default function OfertasPage() {
     } catch (err) { setMsg(err instanceof Error ? err.message : 'Erro'); }
   }
 
-  const webhookUrl = contaId ? `${API_BASE}/webhooks/hotmart/${contaId}` : '...';
-
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <PainelNav />
-      <div className="max-w-5xl mx-auto px-5 py-8 space-y-8">
+    <Shell area="painel">
+      <div className="p-6 space-y-8">
         {msg && <p className="text-sm text-tribo-600 dark:text-tribo-400">{msg}</p>}
 
-        {/* Integração */}
-        <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Integração Hotmart</h2>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${integrado ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700'}`}>
-              {integrado ? 'conectada' : 'não conectada'}
-            </span>
+        {/* Integrações */}
+        <section className="space-y-4">
+          <h2 className="font-semibold">Integrações (área de membros via webhook)</h2>
+          <div className="grid lg:grid-cols-3 gap-4">
+            {PLATAFORMAS.map((p) => {
+              const conectada = integracoes.includes(p.key);
+              return (
+                <div key={p.key} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold">{p.label}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${conectada ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700'}`}>
+                      {conectada ? 'conectada' : 'não conectada'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">URL do webhook (cole na {p.label}):</p>
+                  <code className="block text-xs bg-slate-100 dark:bg-slate-700 rounded px-3 py-2 mb-3 break-all">{webhookUrl(p.key, p.auth)}</code>
+                  <div className="flex gap-2">
+                    <input
+                      value={secrets[p.key] ?? ''}
+                      onChange={(e) => setSecrets((s) => ({ ...s, [p.key]: e.target.value }))}
+                      placeholder={p.secretLabel}
+                      className="flex-1 min-w-0 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+                    />
+                    <button onClick={() => salvarSecret(p.key)} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 rounded-lg">Salvar</button>
+                  </div>
+                  {p.auth === 'query' && (
+                    <p className="text-[11px] text-slate-400 mt-2">Salve o segredo e cole a URL acima (com o <code>?token=</code>) na {p.label}.</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">URL do webhook (cole na Hotmart):</p>
-          <code className="block text-xs bg-slate-100 dark:bg-slate-700 rounded px-3 py-2 mb-3 break-all">{webhookUrl}</code>
-          <form onSubmit={salvarSecret} className="flex gap-2">
-            <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="hottok / segredo do webhook" required
-              className="flex-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm" />
-            <button className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 rounded-lg">Salvar</button>
-          </form>
         </section>
 
         {/* Ofertas */}
@@ -139,6 +166,6 @@ export default function OfertasPage() {
           </aside>
         </section>
       </div>
-    </main>
+    </Shell>
   );
 }

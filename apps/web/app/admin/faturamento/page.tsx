@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { Shell } from '../../../components/Shell';
 
 interface Fatura {
   id: string;
@@ -74,15 +74,9 @@ export default function FaturamentoPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <Link href="/admin/contas" className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white">← Contas</Link>
-          <span className="font-semibold">Faturamento</span>
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto px-5 py-8 space-y-5">
+    <Shell area="admin">
+      <div className="p-6 space-y-5">
+        <h1 className="text-2xl font-bold">Faturamento</h1>
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">Competência
             <input value={competencia} onChange={(e) => setCompetencia(e.target.value)} placeholder="YYYY-MM"
@@ -128,6 +122,6 @@ export default function FaturamentoPage() {
           </table>
         </div>
       </div>
-    </main>
+    </Shell>
   );
 }

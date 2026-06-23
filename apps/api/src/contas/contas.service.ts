@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Role, TipoCobranca, TipoConta } from '@tribohub/db';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../auth/auth.service';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContaDto, UpdateAssinaturaDto, UpdateContaDto } from './dto/create-conta.dto';
 
@@ -17,7 +18,10 @@ function slugify(texto: string): string {
 
 @Injectable()
 export class ContasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   private async slugUnico(base: string): Promise<string> {
     const raiz = slugify(base) || 'conta';
@@ -34,9 +38,10 @@ export class ContasService {
     const emailNorm = dto.adminEmail.trim().toLowerCase();
     const slug = await this.slugUnico(dto.nome);
 
-    // senha temporária do admin (em produção: enviar via convite por e-mail)
+    // senha temporária (fallback exibido na tela) + token de convite (define a própria senha por e-mail)
     const senhaTemporaria = randomBytes(6).toString('base64url');
     const senhaHash = await AuthService.hashSenha(senhaTemporaria);
+    const conviteToken = randomBytes(32).toString('hex');
 
     const ehInfo = dto.tipoConta === TipoConta.infoprodutor;
 
@@ -61,6 +66,16 @@ export class ContasService {
         },
       });
 
+      await tx.inviteToken.create({
+        data: {
+          email: emailNorm,
+          contaId: c.id,
+          role: Role.admin_tenant,
+          token: conviteToken,
+          expiraEm: new Date(Date.now() + 7 * 24 * 60 * 60_000),
+        },
+      });
+
       await tx.assinaturaPlataforma.create({
         data: {
           contaId: c.id,
@@ -76,9 +91,19 @@ export class ContasService {
       return c;
     });
 
+    // envia o convite por e-mail (define a própria senha); senha temporária fica como fallback
+    let conviteEnviado = false;
+    try {
+      await this.email.convite(emailNorm, dto.adminNome, dto.nome, conviteToken);
+      conviteEnviado = true;
+    } catch {
+      // falha de e-mail não impede a criação da conta
+    }
+
     return {
       conta,
-      admin: { email: emailNorm, senhaTemporaria }, // DEV: enviar por convite (Resend) na sequência
+      admin: { email: emailNorm, senhaTemporaria },
+      conviteEnviado,
     };
   }
 
@@ -116,6 +141,34 @@ export class ContasService {
     return this.prisma.conta.update({ where: { id }, data: dto });
   }
 
+  // Métricas agregadas de uma conta (Super Admin).
+  async metricas(id: string) {
+    const conta = await this.obter(id);
+    const ultimaFatura = await this.prisma.faturaPlataforma.findFirst({
+      where: { contaId: id },
+      orderBy: { competencia: 'desc' },
+      select: { competencia: true, valorTotal: true, status: true },
+    });
+
+    if (conta.tipoConta === TipoConta.infoprodutor) {
+      const [matriculas, ativas, certificados] = await Promise.all([
+        this.prisma.matricula.count({ where: { contaId: id } }),
+        this.prisma.matricula.count({
+          where: { contaId: id, status: 'ativa', OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }] },
+        }),
+        this.prisma.certificado.count({ where: { contaId: id } }),
+      ]);
+      return { tipo: 'infoprodutor', matriculas, matriculasAtivas: ativas, certificados, ultimaFatura };
+    }
+
+    const [colaboradores, ativos, certificados] = await Promise.all([
+      this.prisma.usuario.count({ where: { contaId: id, role: Role.aluno } }),
+      this.prisma.usuario.count({ where: { contaId: id, role: Role.aluno, ativo: true } }),
+      this.prisma.certificado.count({ where: { contaId: id } }),
+    ]);
+    return { tipo: 'corporativo', colaboradores, colaboradoresAtivos: ativos, certificados, ultimaFatura };
+  }
+
   listarUsuarios(contaId: string) {
     return this.prisma.usuario.findMany({
       where: { contaId },
@@ -146,5 +199,27 @@ export class ContasService {
       await tx.usuario.updateMany({ where: { contaId: id }, data: { ativo } });
       return conta;
     });
+  }
+
+  // --- Atalhos do menu lateral do Super Admin (abrem em nova aba) ---
+
+  listarLinksMenu() {
+    return this.prisma.linkMenuAdmin.findMany({
+      orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async criarLinkMenu(nome: string, url: string) {
+    const limpo = url.trim();
+    const urlFinal = /^https?:\/\//i.test(limpo) ? limpo : `https://${limpo}`;
+    const maxOrdem = await this.prisma.linkMenuAdmin.aggregate({ _max: { ordem: true } });
+    return this.prisma.linkMenuAdmin.create({
+      data: { nome: nome.trim(), url: urlFinal, ordem: (maxOrdem._max.ordem ?? 0) + 1 },
+    });
+  }
+
+  async removerLinkMenu(id: string) {
+    await this.prisma.linkMenuAdmin.delete({ where: { id } });
+    return { ok: true };
   }
 }

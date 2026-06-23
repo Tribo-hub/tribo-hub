@@ -1,5 +1,6 @@
 import { TipoConta } from '@tribohub/db';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsInt,
@@ -53,6 +54,10 @@ export class UpdateContaDto {
   @IsOptional()
   @IsString()
   corPrimaria?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  permiteAutoCadastro?: boolean;
 }
 
 export class UpdateAssinaturaDto {

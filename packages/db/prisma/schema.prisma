@@ -104,6 +104,7 @@ model Conta {
   subdominio     String    @unique
   dominioProprio String?   @unique
   ativo          Boolean   @default(true)
+  permiteAutoCadastro Boolean @default(false) // infoprodutor: aluno pode se auto-cadastrar
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -448,4 +449,28 @@ enum StatusFatura {
   pendente
   paga
   cancelada
+}
+
+// Token de redefinição de senha (vale para qualquer usuário, inclusive super_admin).
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  usuarioId String
+  token     String   @unique
+  usado     Boolean  @default(false)
+  expiraEm  DateTime
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+  @@map("password_reset_tokens")
+}
+
+// Atalhos configuráveis no menu lateral do Super Admin (abrem em nova aba).
+model LinkMenuAdmin {
+  id        String   @id @default(uuid())
+  nome      String
+  url       String
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("links_menu_admin")
 }

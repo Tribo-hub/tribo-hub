@@ -10,16 +10,20 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { env } from '@tribohub/config';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MAX_TENTATIVAS = 5;
 const BLOQUEIO_MINUTOS = 30;
+const RESET_VALIDADE_MIN = 60;
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly email: EmailService,
   ) {}
 
   static async hashSenha(senha: string): Promise<string> {
@@ -84,6 +88,31 @@ export class AuthService {
     };
   }
 
+  // Auto-cadastro do aluno (infoprodutor), quando a conta permite.
+  async signup(nome: string, email: string, senha: string, tenantSlug: string | null) {
+    if (!tenantSlug) throw new BadRequestException('Conta (tenant) é obrigatória');
+    const conta = await this.prisma.conta.findUnique({ where: { slug: tenantSlug } });
+    if (!conta || !conta.ativo) throw new BadRequestException('Conta inválida');
+    if (conta.tipoConta !== 'infoprodutor' || !conta.permiteAutoCadastro) {
+      throw new ForbiddenException('Auto-cadastro não disponível para esta conta');
+    }
+    const emailNorm = email.trim().toLowerCase();
+    const existente = await this.prisma.usuario.findFirst({
+      where: { email: emailNorm, contaId: conta.id },
+    });
+    if (existente) throw new BadRequestException('Já existe um cadastro com este e-mail');
+
+    const senhaHash = await AuthService.hashSenha(senha);
+    const user = await this.prisma.usuario.create({
+      data: { contaId: conta.id, nome: nome.trim() || emailNorm, email: emailNorm, senhaHash, role: 'aluno' },
+    });
+    const tokens = await this.emitirTokens(user.id, user.role, user.contaId);
+    return {
+      ...tokens,
+      usuario: { id: user.id, nome: user.nome, email: user.email, role: user.role, contaId: user.contaId },
+    };
+  }
+
   async refresh(refreshToken: string) {
     let payload: { sub: string };
     try {
@@ -112,6 +141,50 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.usuario.update({ where: { id: user.id }, data: { senhaHash, ativo: true } }),
       this.prisma.inviteToken.update({ where: { id: convite.id }, data: { usado: true } }),
+    ]);
+    return { ok: true };
+  }
+
+  // Solicita redefinição de senha. Resposta é sempre ok (não revela se o e-mail existe).
+  async solicitarResetSenha(email: string, tenantSlug: string | null) {
+    const emailNorm = email.trim().toLowerCase();
+    let contaId: string | null = null;
+    if (tenantSlug) {
+      const conta = await this.prisma.conta.findUnique({ where: { slug: tenantSlug } });
+      if (!conta) return { ok: true }; // tenant inválido — não revela nada
+      contaId = conta.id;
+    }
+    const user = await this.prisma.usuario.findFirst({ where: { email: emailNorm, contaId } });
+    if (user && user.ativo) {
+      const token = randomBytes(32).toString('hex');
+      await this.prisma.passwordResetToken.create({
+        data: {
+          usuarioId: user.id,
+          token,
+          expiraEm: new Date(Date.now() + RESET_VALIDADE_MIN * 60_000),
+        },
+      });
+      try {
+        await this.email.recuperacaoSenha(user.email, user.nome, token);
+      } catch {
+        // falha de e-mail não vaza estado ao cliente
+      }
+    }
+    return { ok: true };
+  }
+
+  async redefinirSenha(token: string, senha: string) {
+    const t = await this.prisma.passwordResetToken.findUnique({ where: { token } });
+    if (!t || t.usado || t.expiraEm < new Date()) {
+      throw new BadRequestException('Link inválido ou expirado');
+    }
+    const senhaHash = await AuthService.hashSenha(senha);
+    await this.prisma.$transaction([
+      this.prisma.usuario.update({
+        where: { id: t.usuarioId },
+        data: { senhaHash, tentativasFalhas: 0, bloqueadoAte: null },
+      }),
+      this.prisma.passwordResetToken.update({ where: { id: t.id }, data: { usado: true } }),
     ]);
     return { ok: true };
   }

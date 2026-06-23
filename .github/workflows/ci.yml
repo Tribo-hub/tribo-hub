@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # URL usada no build estático do front (placeholder de CI)
+      NEXT_PUBLIC_API_URL: https://tribohub-production.up.railway.app/api
     steps:
       - uses: actions/checkout@v4
 
@@ -17,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install
@@ -26,15 +29,18 @@ jobs:
       - name: Prisma generate
         run: pnpm --filter @tribohub/db generate
 
+      - name: Prisma validate
+        run: pnpm --filter @tribohub/db exec prisma validate
+
       - name: Build packages
         run: |
           pnpm --filter @tribohub/config build
           pnpm --filter @tribohub/db build
 
+      - name: Test (API)
+        run: pnpm --filter @tribohub/api test
+
       - name: Build apps
         run: |
           pnpm --filter @tribohub/api build
           pnpm --filter @tribohub/web build
-
-      - name: Test (API)
-        run: pnpm --filter @tribohub/api test

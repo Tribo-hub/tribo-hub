@@ -88,6 +88,61 @@ export class InfoprodutorService {
     return new Set(ativas.map((m) => m.usuarioId)).size;
   }
 
+  // Dashboard: taxa de conclusão por curso (trilha) da conta.
+  async dashboardCursos(contaId: string) {
+    const trilhas = await this.prisma.trilha.findMany({
+      where: { contaId, deletedAt: null },
+      select: { id: true, titulo: true },
+    });
+    return Promise.all(
+      trilhas.map(async (t) => {
+        const [matriculas, certificados] = await Promise.all([
+          this.prisma.matricula.count({ where: { contaId, trilhaId: t.id } }),
+          this.prisma.certificado.count({ where: { contaId, trilhaId: t.id } }),
+        ]);
+        return {
+          trilhaId: t.id,
+          titulo: t.titulo,
+          matriculas,
+          certificados,
+          taxaConclusao: matriculas ? Math.round((certificados / matriculas) * 100) : 0,
+        };
+      }),
+    );
+  }
+
+  // Dashboard: vendas do mês (receita) + últimas transações aprovadas.
+  async dashboardVendas(contaId: string) {
+    const inicioMes = new Date();
+    inicioMes.setUTCDate(1);
+    inicioMes.setUTCHours(0, 0, 0, 0);
+
+    const [agg, ultimas] = await Promise.all([
+      this.prisma.transacao.aggregate({
+        where: { contaId, status: 'aprovada', eventoEm: { gte: inicioMes } },
+        _sum: { valorBruto: true },
+        _count: true,
+      }),
+      this.prisma.transacao.findMany({
+        where: { contaId, status: 'aprovada' },
+        orderBy: { eventoEm: 'desc' },
+        take: 8,
+        include: { usuario: { select: { nome: true } } },
+      }),
+    ]);
+
+    return {
+      receitaMes: Number(agg._sum.valorBruto ?? 0),
+      vendasMes: agg._count,
+      ultimas: ultimas.map((t) => ({
+        id: t.id,
+        aluno: t.usuario?.nome ?? '—',
+        valor: Number(t.valorBruto),
+        data: t.eventoEm,
+      })),
+    };
+  }
+
   private async matriculaDaConta(contaId: string, id: string) {
     const m = await this.prisma.matricula.findFirst({ where: { id, contaId } });
     if (!m) throw new NotFoundException('Matrícula não encontrada');

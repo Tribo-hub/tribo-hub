@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, setToken } from '../../lib/api';
@@ -97,6 +98,12 @@ export default function LoginPage() {
         >
           {carregando ? 'Entrando...' : 'Entrar'}
         </button>
+        <Link
+          href="/esqueci-senha"
+          className="block text-center text-sm text-slate-500 hover:text-tribo-600 dark:hover:text-tribo-400"
+        >
+          Esqueci minha senha
+        </Link>
       </form>
     </main>
   );

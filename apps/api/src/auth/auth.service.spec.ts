@@ -6,6 +6,8 @@ const jwt = {
   verifyAsync: jest.fn(),
 } as any;
 
+const email = { recuperacaoSenha: jest.fn() } as any;
+
 function mkPrisma(user: any) {
   return {
     usuario: {
@@ -33,7 +35,7 @@ describe('AuthService.login', () => {
       email: 'x@x.com',
     };
     const prisma = mkPrisma(user);
-    const res = await new AuthService(prisma, jwt).login('x@x.com', 'senha123', null);
+    const res = await new AuthService(prisma, jwt, email).login('x@x.com', 'senha123', null);
     expect(res.accessToken).toBe('tok');
     expect(res.usuario.id).toBe('u1');
   });
@@ -49,7 +51,7 @@ describe('AuthService.login', () => {
       contaId: null,
     };
     const prisma = mkPrisma(user);
-    await expect(new AuthService(prisma, jwt).login('x', 'errada', null)).rejects.toThrow();
+    await expect(new AuthService(prisma, jwt, email).login('x', 'errada', null)).rejects.toThrow();
     expect(prisma.usuario.update).toHaveBeenCalled();
   });
 
@@ -64,7 +66,7 @@ describe('AuthService.login', () => {
       contaId: null,
     };
     const prisma = mkPrisma(user);
-    await expect(new AuthService(prisma, jwt).login('x', 'errada', null)).rejects.toThrow();
+    await expect(new AuthService(prisma, jwt, email).login('x', 'errada', null)).rejects.toThrow();
     expect(prisma.usuario.update.mock.calls[0][0].data.bloqueadoAte).toBeDefined();
   });
 
@@ -79,6 +81,6 @@ describe('AuthService.login', () => {
       contaId: null,
     };
     const prisma = mkPrisma(user);
-    await expect(new AuthService(prisma, jwt).login('x', 'senha123', null)).rejects.toThrow();
+    await expect(new AuthService(prisma, jwt, email).login('x', 'senha123', null)).rejects.toThrow();
   });
 });

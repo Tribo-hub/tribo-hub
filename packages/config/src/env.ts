@@ -24,6 +24,7 @@ const schema = z.object({
   COOKIE_SECRET: z.string().min(1),
   CRON_SECRET: z.string().optional(),
   INTERNAL_API_KEY: z.string().optional(),
+  SENTRY_DSN: z.string().optional(), // observabilidade (opcional; ativa o Sentry se presente)
 
   // Storage (Fase 2)
   SUPABASE_URL: z.string().optional(),
@@ -42,6 +43,7 @@ const schema = z.object({
   EFI_CLIENT_SECRET: z.string().optional(),
   EFI_PIX_KEY: z.string().optional(),
   EFI_CERTIFICATE_PATH: z.string().optional(),
+  EFI_CERTIFICATE_BASE64: z.string().optional(), // cert .p12 em base64 (produção/Railway)
   EFI_SANDBOX: z.string().optional(),
 });
 

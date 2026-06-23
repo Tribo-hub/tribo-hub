@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { Shell } from '../../../components/Shell';
 
 interface Conta {
   id: string;
@@ -23,6 +24,7 @@ interface ListaContas {
 interface CriarResposta {
   conta: Conta;
   admin: { email: string; senhaTemporaria: string };
+  conviteEnviado: boolean;
 }
 
 export default function ContasPage() {
@@ -32,6 +34,7 @@ export default function ContasPage() {
   const [erro, setErro] = useState('');
   const [criando, setCriando] = useState(false);
   const [novoAdmin, setNovoAdmin] = useState<CriarResposta['admin'] | null>(null);
+  const [conviteEnviado, setConviteEnviado] = useState(false);
 
   const [form, setForm] = useState({
     nome: '',
@@ -75,6 +78,7 @@ export default function ContasPage() {
         body: JSON.stringify(form),
       });
       setNovoAdmin(res.admin);
+      setConviteEnviado(res.conviteEnviado);
       setForm({ nome: '', tipoConta: 'infoprodutor', adminNome: '', adminEmail: '' });
       await carregar();
     } catch (err) {
@@ -84,27 +88,24 @@ export default function ContasPage() {
     }
   }
 
-  function sair() {
-    clearToken();
-    router.replace('/login');
-  }
-
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-tribo-600 grid place-items-center text-white text-sm font-bold">T</div>
-            <span className="font-semibold">Tribo Hub · Super Admin</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <Link href="/admin/faturamento" className="text-slate-500 hover:text-slate-800 dark:hover:text-white">Faturamento</Link>
-            <button onClick={sair} className="text-slate-500 hover:text-slate-800 dark:hover:text-white">Sair</button>
-          </div>
+    <Shell area="admin">
+      <div className="p-6 space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total de contas', value: contas.length },
+            { label: 'Infoprodutores', value: contas.filter((c) => c.tipoConta === 'infoprodutor').length },
+            { label: 'Corporativo', value: contas.filter((c) => c.tipoConta === 'corporativo').length },
+            { label: 'Ativas', value: contas.filter((c) => c.ativo).length },
+          ].map((s) => (
+            <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
+              <p className="text-3xl font-bold mt-1">{s.value}</p>
+            </div>
+          ))}
         </div>
-      </header>
 
-      <div className="max-w-5xl mx-auto px-5 py-8 grid lg:grid-cols-[1fr_340px] gap-6">
+        <div className="grid lg:grid-cols-[1fr_340px] gap-6">
         {/* lista */}
         <section>
           <h1 className="text-xl font-bold mb-4">Contas</h1>
@@ -153,9 +154,13 @@ export default function ContasPage() {
             <div className="mb-4 text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg p-3">
               Conta criada! Admin: <b>{novoAdmin.email}</b>
               <br />
-              Senha temporária: <b>{novoAdmin.senhaTemporaria}</b>
+              {conviteEnviado ? (
+                <span>✉️ Convite enviado por e-mail para o admin definir a senha.</span>
+              ) : (
+                <span className="opacity-80">⚠️ E-mail não enviado (Resend?). Use a senha temporária abaixo.</span>
+              )}
               <br />
-              <span className="opacity-80">(envie ao admin — futuramente por e-mail)</span>
+              Senha temporária (fallback): <b>{novoAdmin.senhaTemporaria}</b>
             </div>
           )}
 
@@ -199,7 +204,8 @@ export default function ContasPage() {
             </button>
           </form>
         </aside>
+        </div>
       </div>
-    </main>
+    </Shell>
   );
 }

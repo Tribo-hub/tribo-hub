@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { env } from '@tribohub/config';
 import { InfoprodutorService } from './infoprodutor.service';
@@ -27,6 +28,29 @@ export class WebhookController {
     @Body() body: any,
   ) {
     return this.webhook.hotmart(contaId, hottok ?? body?.hottok, body);
+  }
+
+  // Kiwify/Eduzz: segredo via querystring (?token=) — configure a URL com ?token=SEGREDO.
+  @Post('webhooks/kiwify/:contaId')
+  @HttpCode(200)
+  kiwify(
+    @Param('contaId') contaId: string,
+    @Query('token') token: string,
+    @Headers('x-kiwify-token') header: string,
+    @Body() body: any,
+  ) {
+    return this.webhook.kiwify(contaId, token ?? header ?? body?.token, body);
+  }
+
+  @Post('webhooks/eduzz/:contaId')
+  @HttpCode(200)
+  eduzz(
+    @Param('contaId') contaId: string,
+    @Query('token') token: string,
+    @Headers('x-eduzz-token') header: string,
+    @Body() body: any,
+  ) {
+    return this.webhook.eduzz(contaId, token ?? header ?? body?.token, body);
   }
 
   // Cron protegido por segredo — expira matrículas vencidas.

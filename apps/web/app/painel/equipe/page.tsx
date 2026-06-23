@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
-import { PainelNav } from '../PainelNav';
+import { Shell } from '../../../components/Shell';
 
 interface Colaborador {
   id: string;
@@ -64,9 +64,8 @@ export default function EquipePage() {
       : '';
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <PainelNav />
-      <div className="max-w-5xl mx-auto px-5 py-8 grid lg:grid-cols-[1fr_300px] gap-6">
+    <Shell area="painel">
+      <div className="p-6 grid lg:grid-cols-[1fr_300px] gap-6">
         <section>
           <h1 className="text-xl font-bold mb-4">Equipe</h1>
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -111,6 +110,6 @@ export default function EquipePage() {
           </form>
         </aside>
       </div>
-    </main>
+    </Shell>
   );
 }

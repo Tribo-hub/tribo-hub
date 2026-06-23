@@ -107,12 +107,25 @@ export class AlunoService {
               a.tipoVideo === 'upload'
                 ? (await this.storage.urlDeDownload(a.videoUrl)).url
                 : a.videoUrl,
+            materialUrl: await this.assinarSeArquivo(a.materialUrl),
+            legendaUrl: await this.assinarSeArquivo(a.legendaUrl),
           })),
         ),
       })),
     );
 
     return { id: trilha.id, titulo: trilha.titulo, descricao: trilha.descricao, modulos: modulosOut };
+  }
+
+  // Material/legenda: se for caminho do Storage, devolve URL assinada; se já for URL, mantém.
+  private async assinarSeArquivo(url: string | null): Promise<string | null> {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    try {
+      return (await this.storage.urlDeDownload(url)).url;
+    } catch {
+      return null;
+    }
   }
 
   async proximaAula(user: AuthUser, trilhaId: string) {
@@ -217,19 +230,21 @@ export class AlunoService {
       include: {
         usuario: { select: { nome: true } },
         trilha: { select: { titulo: true } },
-        conta: { select: { nome: true } },
+        conta: { select: { nome: true, logoUrl: true } },
       },
     });
     if (!cert || cert.usuarioId !== user.sub) throw new NotFoundException('Certificado não encontrado');
 
     let path = cert.pdfUrl;
     if (!path) {
+      const logo = await this.carregarLogo(cert.conta.logoUrl);
       const buffer = await this.gerarPdf({
         aluno: cert.usuario.nome,
         trilha: cert.trilha.titulo,
         emissor: cert.conta.nome,
         codigo: cert.codigoVerificacao,
         data: cert.emitidoEm,
+        logo,
       });
       path = `${cert.contaId}/certificados/${cert.codigoVerificacao}.pdf`;
       await this.storage.uploadBuffer(path, buffer, 'application/pdf');
@@ -238,12 +253,26 @@ export class AlunoService {
     return this.storage.urlDeDownload(path);
   }
 
+  // Baixa os bytes do logo da conta (caminho do Storage ou URL externa) para embutir no PDF.
+  private async carregarLogo(logoUrl: string | null): Promise<Buffer | null> {
+    if (!logoUrl) return null;
+    try {
+      const url = logoUrl.startsWith('http') ? logoUrl : (await this.storage.urlDeDownload(logoUrl)).url;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      return Buffer.from(await r.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
   private gerarPdf(d: {
     aluno: string;
     trilha: string;
     emissor: string;
     codigo: string;
     data: Date;
+    logo?: Buffer | null;
   }): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 50 });
@@ -255,6 +284,14 @@ export class AlunoService {
       const w = doc.page.width;
       const hgt = doc.page.height;
       doc.lineWidth(3).strokeColor('#7c3aed').rect(20, 20, w - 40, hgt - 40).stroke();
+      if (d.logo) {
+        try {
+          doc.image(d.logo, (w - 120) / 2, 40, { fit: [120, 60], align: 'center' });
+          doc.y = 110;
+        } catch {
+          /* logo inválido — segue sem ele */
+        }
+      }
       doc.moveDown(2);
       doc.fontSize(34).fillColor('#1e293b').text('CERTIFICADO', { align: 'center' });
       doc.moveDown(0.3);

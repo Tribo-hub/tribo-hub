@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
+import { Shell } from '../../../../components/Shell';
 
 interface Assinatura {
   plano: string;
@@ -20,6 +21,7 @@ interface Conta {
   tipoConta: 'corporativo' | 'infoprodutor';
   slug: string;
   ativo: boolean;
+  permiteAutoCadastro: boolean;
   assinatura: Assinatura | null;
   _count?: { usuarios: number };
 }
@@ -29,6 +31,15 @@ interface Usuario {
   email: string;
   role: string;
   ativo: boolean;
+}
+interface Metricas {
+  tipo: string;
+  matriculas?: number;
+  matriculasAtivas?: number;
+  colaboradores?: number;
+  colaboradoresAtivos?: number;
+  certificados?: number;
+  ultimaFatura?: { competencia: string; valorTotal: string; status: string } | null;
 }
 
 export default function ContaDetalhe() {
@@ -40,6 +51,7 @@ export default function ContaDetalhe() {
 
   const [conta, setConta] = useState<Conta | null>(null);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [msg, setMsg] = useState('');
   const [form, setForm] = useState({ plano: '', valorBase: '', limiteUsuarios: '', alunosIncluidos: '', valorPorExcedente: '' });
 
@@ -58,6 +70,7 @@ export default function ContaDetalhe() {
         });
       }
       setUsuarios(await api<Usuario[]>(`/admin/contas/${id}/usuarios`));
+      setMetricas(await api<Metricas>(`/admin/contas/${id}/metricas`));
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         clearToken();
@@ -96,6 +109,15 @@ export default function ContaDetalhe() {
     await carregar();
   }
 
+  async function alternarAutoCadastro() {
+    if (!conta) return;
+    await api(`/admin/contas/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ permiteAutoCadastro: !conta.permiteAutoCadastro }),
+    });
+    await carregar();
+  }
+
   if (!conta) {
     return <main className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-900 text-slate-500">{msg || 'Carregando...'}</main>;
   }
@@ -103,15 +125,9 @@ export default function ContaDetalhe() {
   const ehInfo = conta.tipoConta === 'infoprodutor';
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-4xl mx-auto px-5 h-14 flex items-center justify-between">
-          <Link href="/admin/contas" className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white">← Contas</Link>
-          <span className="font-semibold">Tribo Hub · Super Admin</span>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-5 py-8 space-y-6">
+    <Shell area="admin">
+      <div className="p-6 max-w-4xl space-y-6">
+        <Link href="/admin/contas" className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white">← Contas</Link>
         {msg && <p className="text-sm text-tribo-600 dark:text-tribo-400">{msg}</p>}
 
         {/* Cabeçalho da conta */}
@@ -127,6 +143,59 @@ export default function ContaDetalhe() {
             {conta.ativo ? 'Suspender conta' : 'Reativar conta'}
           </button>
         </div>
+
+        {/* Auto-cadastro (somente infoprodutor) */}
+        {ehInfo && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 flex items-center justify-between">
+            <div>
+              <p className="font-semibold">Auto-cadastro de alunos</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Permite que alunos criem conta sozinhos em <code>/cadastro</code> (área de membros).
+              </p>
+            </div>
+            <button
+              onClick={alternarAutoCadastro}
+              className={`text-sm font-semibold px-4 py-2 rounded-lg ${
+                conta.permiteAutoCadastro
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                  : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+              }`}
+            >
+              {conta.permiteAutoCadastro ? 'Ativado' : 'Desativado'}
+            </button>
+          </div>
+        )}
+
+        {/* Métricas */}
+        {metricas && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {(metricas.tipo === 'infoprodutor'
+              ? [
+                  { label: 'Matrículas', value: metricas.matriculas ?? 0 },
+                  { label: 'Ativas (cobrança)', value: metricas.matriculasAtivas ?? 0 },
+                  { label: 'Certificados', value: metricas.certificados ?? 0 },
+                  {
+                    label: 'Última fatura',
+                    value: metricas.ultimaFatura ? `R$ ${Number(metricas.ultimaFatura.valorTotal).toFixed(2)}` : '—',
+                  },
+                ]
+              : [
+                  { label: 'Colaboradores', value: metricas.colaboradores ?? 0 },
+                  { label: 'Ativos', value: metricas.colaboradoresAtivos ?? 0 },
+                  { label: 'Certificados', value: metricas.certificados ?? 0 },
+                  {
+                    label: 'Última fatura',
+                    value: metricas.ultimaFatura ? `R$ ${Number(metricas.ultimaFatura.valorTotal).toFixed(2)}` : '—',
+                  },
+                ]
+            ).map((m) => (
+              <div key={m.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400">{m.label}</p>
+                <p className="text-2xl font-bold mt-1">{m.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Plano / assinatura */}
         <form onSubmit={salvarAssinatura} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 space-y-3">
@@ -179,6 +248,6 @@ export default function ContaDetalhe() {
           </ul>
         </div>
       </div>
-    </main>
+    </Shell>
   );
 }

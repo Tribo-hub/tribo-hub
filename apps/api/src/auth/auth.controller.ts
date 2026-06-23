@@ -1,7 +1,14 @@
 import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { AcceptInviteDto, LoginDto, RefreshDto } from './dto/login.dto';
+import {
+  AcceptInviteDto,
+  ForgotPasswordDto,
+  LoginDto,
+  RefreshDto,
+  ResetPasswordDto,
+  SignupDto,
+} from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -25,6 +32,26 @@ export class AuthController {
   @HttpCode(200)
   aceitarConvite(@Body() dto: AcceptInviteDto) {
     return this.auth.aceitarConvite(dto.token, dto.senha);
+  }
+
+  @Post('signup')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  signup(@Body() dto: SignupDto, @Req() req: any) {
+    return this.auth.signup(dto.nome, dto.email, dto.senha, req.tenantSlug ?? dto.tenant ?? null);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  forgot(@Body() dto: ForgotPasswordDto, @Req() req: any) {
+    return this.auth.solicitarResetSenha(dto.email, req.tenantSlug ?? dto.tenant ?? null);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  reset(@Body() dto: ResetPasswordDto) {
+    return this.auth.redefinirSenha(dto.token, dto.senha);
   }
 
   @Post('logout')

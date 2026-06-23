@@ -18,6 +18,8 @@ import {
   CreateAulaDto,
   CreateModuloDto,
   CreateTrilhaDto,
+  UpdateAulaDto,
+  UpdateModuloDto,
   UpdateTrilhaDto,
 } from './dto/conteudo.dto';
 
@@ -71,7 +73,7 @@ export class ConteudoController {
   atualizarModulo(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
-    @Body() dto: CreateModuloDto,
+    @Body() dto: UpdateModuloDto,
   ) {
     return this.conteudo.atualizarModulo(u, id, dto);
   }
@@ -95,7 +97,7 @@ export class ConteudoController {
   atualizarAula(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
-    @Body() dto: CreateAulaDto,
+    @Body() dto: UpdateAulaDto,
   ) {
     return this.conteudo.atualizarAula(u, id, dto);
   }

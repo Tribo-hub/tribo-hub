@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
+import { Shell } from '../../../../components/Shell';
 
 interface Aula {
   id: string;
@@ -68,6 +69,16 @@ export default function TrilhaDetalhePage() {
     }
   }
 
+  async function mover(tipo: 'modulos' | 'aulas', a: { id: string; ordem: number }, b: { id: string; ordem: number }) {
+    try {
+      await api(`/painel/${tipo}/${a.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: b.ordem }) });
+      await api(`/painel/${tipo}/${b.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: a.ordem }) });
+      await carregar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro');
+    }
+  }
+
   if (!trilha) {
     return (
       <main className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-900 text-slate-500">
@@ -77,8 +88,8 @@ export default function TrilhaDetalhePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <div className="max-w-3xl mx-auto px-5 py-8">
+    <Shell area="painel">
+      <div className="p-6 max-w-3xl">
         <Link href="/painel/conteudo" className="text-sm text-slate-500 hover:underline">
           ← Voltar
         </Link>
@@ -105,21 +116,20 @@ export default function TrilhaDetalhePage() {
         {erro && <p className="text-sm text-rose-600 mb-3">{erro}</p>}
 
         <div className="space-y-4">
-          {trilha.modulos.map((m) => (
+          {trilha.modulos.map((m, mi) => (
             <div key={m.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <div className="px-5 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
                 <span className="font-semibold">
                   {m.ordem}. {m.titulo}
                 </span>
-                <button
-                  onClick={() => call(`/painel/modulos/${m.id}`, { method: 'DELETE' })}
-                  className="text-xs text-rose-500 hover:underline"
-                >
-                  remover
-                </button>
+                <div className="flex items-center gap-2 text-xs">
+                  <button disabled={mi === 0} onClick={() => mover('modulos', m, trilha.modulos[mi - 1])} className="disabled:opacity-30 hover:text-tribo-600" title="Subir">↑</button>
+                  <button disabled={mi === trilha.modulos.length - 1} onClick={() => mover('modulos', m, trilha.modulos[mi + 1])} className="disabled:opacity-30 hover:text-tribo-600" title="Descer">↓</button>
+                  <button onClick={() => call(`/painel/modulos/${m.id}`, { method: 'DELETE' })} className="text-rose-500 hover:underline">remover</button>
+                </div>
               </div>
               <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
-                {m.aulas.map((a) => (
+                {m.aulas.map((a, ai) => (
                   <li key={a.id} className="px-5 py-2 flex items-center justify-between">
                     <span>
                       {a.ordem}. {a.titulo}{' '}
@@ -127,12 +137,11 @@ export default function TrilhaDetalhePage() {
                         {a.tipoVideo}
                       </span>
                     </span>
-                    <button
-                      onClick={() => call(`/painel/aulas/${a.id}`, { method: 'DELETE' })}
-                      className="text-xs text-rose-500 hover:underline"
-                    >
-                      remover
-                    </button>
+                    <div className="flex items-center gap-2 text-xs">
+                      <button disabled={ai === 0} onClick={() => mover('aulas', a, m.aulas[ai - 1])} className="disabled:opacity-30 hover:text-tribo-600" title="Subir">↑</button>
+                      <button disabled={ai === m.aulas.length - 1} onClick={() => mover('aulas', a, m.aulas[ai + 1])} className="disabled:opacity-30 hover:text-tribo-600" title="Descer">↓</button>
+                      <button onClick={() => call(`/painel/aulas/${a.id}`, { method: 'DELETE' })} className="text-rose-500 hover:underline">remover</button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -171,7 +180,7 @@ export default function TrilhaDetalhePage() {
           </button>
         </form>
       </div>
-    </main>
+    </Shell>
   );
 }
 

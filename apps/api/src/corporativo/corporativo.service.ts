@@ -20,6 +20,15 @@ export class CorporativoService {
     private readonly email: EmailService,
   ) {}
 
+  // ---------- Marca (white-label self-service) ----------
+  async atualizarMarca(contaId: string, dto: { corPrimaria?: string; logoUrl?: string }) {
+    return this.prisma.conta.update({
+      where: { id: contaId },
+      data: { corPrimaria: dto.corPrimaria, logoUrl: dto.logoUrl },
+      select: { corPrimaria: true, logoUrl: true },
+    });
+  }
+
   // ---------- Colaboradores ----------
   async convidar(contaId: string, nome: string, email: string) {
     const emailNorm = email.trim().toLowerCase();
@@ -89,19 +98,33 @@ export class CorporativoService {
 
     if (conta.tipoConta !== TipoConta.corporativo) {
       // resumo p/ infoprodutor
-      const [matriculas, ativosRaw, certificados] = await Promise.all([
+      const inicioMes = new Date();
+      inicioMes.setDate(1);
+      inicioMes.setHours(0, 0, 0, 0);
+      const em30dias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      const [matriculas, ativosRaw, certificados, novosNoMes, aExpirar, hotmart] = await Promise.all([
         this.prisma.matricula.count({ where: { contaId } }),
         this.prisma.matricula.findMany({
           where: { contaId, status: 'ativa', OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }] },
           select: { usuarioId: true },
         }),
         this.prisma.certificado.count({ where: { contaId } }),
+        this.prisma.matricula.count({ where: { contaId, createdAt: { gte: inicioMes } } }),
+        this.prisma.matricula.count({
+          where: { contaId, status: 'ativa', expiraEm: { not: null, gte: new Date(), lte: em30dias } },
+        }),
+        this.prisma.integracao.findFirst({ where: { contaId, plataforma: 'hotmart', ativo: true } }),
       ]);
       return {
         tipo: 'infoprodutor',
         alunosAtivos: new Set(ativosRaw.map((m) => m.usuarioId)).size,
         totalMatriculas: matriculas,
         certificadosEmitidos: certificados,
+        novosNoMes,
+        aExpirar,
+        taxaConclusao: matriculas ? Math.round((certificados / matriculas) * 100) : 0,
+        hotmartConectada: !!hotmart,
       };
     }
 

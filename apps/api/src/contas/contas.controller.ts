@@ -49,6 +49,11 @@ export class ContasController {
     return this.contas.listarUsuarios(id);
   }
 
+  @Get(':id/metricas')
+  metricas(@Param('id') id: string) {
+    return this.contas.metricas(id);
+  }
+
   @Patch(':id/assinatura')
   atualizarAssinatura(@Param('id') id: string, @Body() dto: UpdateAssinaturaDto) {
     return this.contas.atualizarAssinatura(id, dto);

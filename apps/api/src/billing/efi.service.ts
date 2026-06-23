@@ -13,18 +13,25 @@ export class EfiService {
     return env.EFI_SANDBOX === 'false' ? 'pix.api.efipay.com.br' : 'pix-h.api.efipay.com.br';
   }
 
+  // Cert pode vir como arquivo (.p12 local, dev) ou base64 (produção/Railway).
+  private lerCertificado(): Buffer | null {
+    if (env.EFI_CERTIFICATE_BASE64) {
+      return Buffer.from(env.EFI_CERTIFICATE_BASE64, 'base64');
+    }
+    if (env.EFI_CERTIFICATE_PATH && fs.existsSync(env.EFI_CERTIFICATE_PATH)) {
+      return fs.readFileSync(env.EFI_CERTIFICATE_PATH);
+    }
+    return null;
+  }
+
   private configurado() {
-    return !!(
-      env.EFI_CLIENT_ID &&
-      env.EFI_CLIENT_SECRET &&
-      env.EFI_CERTIFICATE_PATH &&
-      fs.existsSync(env.EFI_CERTIFICATE_PATH)
-    );
+    return !!(env.EFI_CLIENT_ID && env.EFI_CLIENT_SECRET && this.lerCertificado());
   }
 
   private getAgent() {
     if (!this.agent) {
-      const pfx = fs.readFileSync(env.EFI_CERTIFICATE_PATH!);
+      const pfx = this.lerCertificado();
+      if (!pfx) throw new InternalServerErrorException('Certificado Efí ausente');
       this.agent = new https.Agent({ pfx, passphrase: '' });
     }
     return this.agent;

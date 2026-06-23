@@ -44,6 +44,21 @@ export async function api<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+// Sobe um arquivo direto ao Storage via URL assinada e devolve o caminho salvo.
+export async function uploadArquivo(pasta: string, file: File): Promise<string> {
+  const { path, signedUrl } = await api<{ path: string; token: string; signedUrl: string }>(
+    '/painel/upload/signed-url',
+    { method: 'POST', body: JSON.stringify({ pasta, nomeArquivo: file.name }) },
+  );
+  const res = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) throw new ApiError('Falha ao enviar o arquivo', res.status);
+  return path;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,

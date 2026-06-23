@@ -33,6 +33,16 @@ export class PainelInfoController {
     return this.info.listarIntegracoes(u.contaId!);
   }
 
+  // Dashboard (infoprodutor)
+  @Get('dashboard/cursos')
+  dashCursos(@CurrentUser() u: AuthUser) {
+    return this.info.dashboardCursos(u.contaId!);
+  }
+  @Get('dashboard/vendas')
+  dashVendas(@CurrentUser() u: AuthUser) {
+    return this.info.dashboardVendas(u.contaId!);
+  }
+
   // Matrículas
   @Get('matriculas')
   matriculas(@CurrentUser() u: AuthUser) {

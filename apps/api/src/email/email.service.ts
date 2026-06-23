@@ -64,6 +64,22 @@ export class EmailService {
     return this.enviar(to, `Acesso liberado — ${curso}`, this.layout('Acesso liberado 🎉', corpo));
   }
 
+  // Recuperação de senha
+  async recuperacaoSenha(to: string, nome: string, token: string) {
+    const url = `${env.APP_URL}/redefinir-senha?token=${token}`;
+    return this.enviar(
+      to,
+      'Redefinição de senha — Tribo Hub',
+      this.layout(
+        'Redefinir senha',
+        `<p>Olá ${nome}, recebemos um pedido para redefinir sua senha. O link vale por 1 hora:</p>${this.botao(
+          'Redefinir minha senha',
+          url,
+        )}<p style="color:#64748b;font-size:13px">Se você não pediu, ignore este e-mail.</p>`,
+      ),
+    );
+  }
+
   // Teste de configuração
   async teste(to: string) {
     return this.enviar(to, 'Tribo Hub — teste de e-mail', this.layout('Funcionou! ✅', '<p>Integração de e-mail (Resend) ativa.</p>'));

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@tribohub/db';
-import { IsEmail, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -16,11 +16,28 @@ class ConvidarDto {
   email!: string;
 }
 
+class MarcaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  corPrimaria?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  logoUrl?: string;
+}
+
 @Controller('painel')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin_tenant)
 export class CorporativoController {
   constructor(private readonly corp: CorporativoService) {}
+
+  @Patch('marca')
+  atualizarMarca(@CurrentUser() u: AuthUser, @Body() dto: MarcaDto) {
+    return this.corp.atualizarMarca(u.contaId!, dto);
+  }
 
   @Post('colaboradores')
   convidar(@CurrentUser() u: AuthUser, @Body() dto: ConvidarDto) {

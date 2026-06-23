@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
-import { PainelNav } from '../PainelNav';
+import { Shell } from '../../../components/Shell';
 
 interface Trilha {
   id: string;
@@ -59,10 +59,8 @@ export default function ConteudoPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <PainelNav />
-
-      <div className="max-w-5xl mx-auto px-5 py-8 grid lg:grid-cols-[1fr_320px] gap-6">
+    <Shell area="painel">
+      <div className="p-6 grid lg:grid-cols-[1fr_320px] gap-6">
         <section>
           <h1 className="text-xl font-bold mb-4">Minhas trilhas</h1>
           {erro && <p className="text-sm text-rose-600 mb-3">{erro}</p>}
@@ -135,6 +133,6 @@ export default function ConteudoPage() {
           </form>
         </aside>
       </div>
-    </main>
+    </Shell>
   );
 }

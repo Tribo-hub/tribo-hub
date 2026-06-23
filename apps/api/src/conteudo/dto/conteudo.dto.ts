@@ -57,6 +57,22 @@ export class CreateModuloDto {
   ordem!: number;
 }
 
+export class UpdateModuloDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  titulo?: string;
+
+  @IsOptional()
+  @IsString()
+  descricao?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  ordem?: number;
+}
+
 export class CreateAulaDto {
   @IsString()
   @MaxLength(255)
@@ -83,4 +99,37 @@ export class CreateAulaDto {
   @IsInt()
   @Min(1)
   ordem!: number;
+}
+
+export class UpdateAulaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  titulo?: string;
+
+  @IsOptional()
+  @IsString()
+  descricao?: string;
+
+  @IsOptional()
+  @IsEnum(TipoVideo)
+  tipoVideo?: TipoVideo;
+
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  videoIdExterno?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  duracaoSegundos?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  ordem?: number;
 }

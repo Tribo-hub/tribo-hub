@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
-import { PainelNav } from '../PainelNav';
+import { Shell } from '../../../components/Shell';
 
 interface Matricula {
   id: string;
@@ -15,12 +15,21 @@ interface Matricula {
 }
 interface Trilha { id: string; titulo: string }
 
+type Filtro = 'todas' | 'ativas' | 'expirar';
+
+function expiraEmBreve(m: Matricula) {
+  if (m.status !== 'ativa' || !m.expiraEm) return false;
+  const dias = (new Date(m.expiraEm).getTime() - Date.now()) / 86_400_000;
+  return dias >= 0 && dias <= 30;
+}
+
 export default function MatriculasPage() {
   const router = useRouter();
   const [matriculas, setMatriculas] = useState<Matricula[]>([]);
   const [ativos, setAtivos] = useState<number | null>(null);
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [msg, setMsg] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('todas');
   const [cortesia, setCortesia] = useState({ email: '', nome: '', trilhaId: '' });
 
   const carregar = useCallback(async () => {
@@ -62,32 +71,57 @@ export default function MatriculasPage() {
     } catch (err) { setMsg(err instanceof Error ? err.message : 'Erro'); }
   }
 
+  const aExpirar = matriculas.filter(expiraEmBreve).length;
+  const visiveis = matriculas.filter((m) =>
+    filtro === 'ativas' ? m.status === 'ativa' : filtro === 'expirar' ? expiraEmBreve(m) : true,
+  );
+  const tabs: { k: Filtro; label: string; n: number }[] = [
+    { k: 'todas', label: 'Todas', n: matriculas.length },
+    { k: 'ativas', label: 'Ativas', n: matriculas.filter((m) => m.status === 'ativa').length },
+    { k: 'expirar', label: 'A expirar (30d)', n: aExpirar },
+  ];
+
   const badge = (s: string) =>
     s === 'ativa' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
     : s === 'inativa' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
     : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <PainelNav />
-      <div className="max-w-5xl mx-auto px-5 py-8 space-y-6">
+    <Shell area="painel">
+      <div className="p-6 space-y-6">
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
             <p className="text-xs text-slate-500 dark:text-slate-400">Alunos ativos (cobrança)</p>
             <p className="text-3xl font-bold mt-1">{ativos ?? '—'}</p>
           </div>
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Total de matrículas</p>
+            <p className="text-3xl font-bold mt-1">{matriculas.length}</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-amber-200 dark:border-amber-900/60 p-5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">A expirar (30 dias)</p>
+            <p className="text-3xl font-bold mt-1 text-amber-600">{aExpirar}</p>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-[1fr_300px] gap-6">
           <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="flex gap-1 p-2 border-b border-slate-100 dark:border-slate-700 text-sm">
+              {tabs.map((t) => (
+                <button key={t.k} onClick={() => setFiltro(t.k)}
+                  className={`px-3 py-1.5 rounded-lg font-medium ${filtro === t.k ? 'bg-tribo-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                  {t.label} <span className="opacity-70">({t.n})</span>
+                </button>
+              ))}
+            </div>
             <table className="w-full text-sm">
               <thead className="text-left text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/40">
                 <tr><th className="px-4 py-2 font-medium">Aluno</th><th className="px-4 py-2 font-medium">Curso</th><th className="px-4 py-2 font-medium">Expira</th><th className="px-4 py-2 font-medium">Status</th><th className="px-4 py-2 font-medium">Ações</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {matriculas.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Nenhuma matrícula ainda.</td></tr>
-                ) : matriculas.map((m) => (
+                {visiveis.length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Nenhuma matrícula {filtro !== 'todas' ? 'neste filtro' : 'ainda'}.</td></tr>
+                ) : visiveis.map((m) => (
                   <tr key={m.id}>
                     <td className="px-4 py-3">{m.usuario.nome}<br /><span className="text-xs text-slate-400">{m.usuario.email}</span></td>
                     <td className="px-4 py-3">{m.trilha.titulo}<br /><span className="text-xs text-slate-400">{m.origem}</span></td>
@@ -122,6 +156,6 @@ export default function MatriculasPage() {
           </aside>
         </div>
       </div>
-    </main>
+    </Shell>
   );
 }

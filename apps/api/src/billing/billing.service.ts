@@ -33,6 +33,29 @@ export class BillingService {
     return cob;
   }
 
+  // Confirma pagamento de uma fatura a partir do txid (usado pelo webhook da Efí).
+  async confirmarPagamentoPorTxid(txid: string) {
+    if (!txid) return { ok: false, motivo: 'txid ausente' };
+    const fatura = await this.prisma.faturaPlataforma.findFirst({ where: { txid } });
+    if (!fatura) return { ok: false, motivo: 'fatura não encontrada' };
+    if (fatura.status === 'paga') return { ok: true, jaPaga: true };
+    await this.prisma.faturaPlataforma.update({
+      where: { id: fatura.id },
+      data: { status: 'paga', pagoEm: new Date() },
+    });
+    return { ok: true, faturaId: fatura.id };
+  }
+
+  // Processa a notificação Pix da Efí: { pix: [{ txid, ... }] }.
+  async processarWebhookEfi(body: { pix?: Array<{ txid?: string }> }) {
+    const itens = Array.isArray(body?.pix) ? body.pix : [];
+    const resultados = [];
+    for (const p of itens) {
+      if (p?.txid) resultados.push(await this.confirmarPagamentoPorTxid(p.txid));
+    }
+    return { ok: true, processados: resultados.length };
+  }
+
   // Marca uma fatura como paga (registro manual pelo super admin).
   async marcarPaga(faturaId: string) {
     const fatura = await this.prisma.faturaPlataforma.findUnique({ where: { id: faturaId } });
