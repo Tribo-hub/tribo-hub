@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../lib/api';
+import { sanitizeHtml } from '../../lib/sanitize';
 
 interface TrilhaResumo {
   id: string;
@@ -14,42 +15,58 @@ interface TrilhaResumo {
   aulasConcluidas: number;
   percentual: number;
 }
+interface Oferta {
+  id: string;
+  titulo: string;
+  descricao: string;
+  capaUrl: string | null;
+  checkoutUrl: string | null;
+  whatsappUrl: string | null;
+}
 interface Me {
   nome: string;
-  conta?: { nome: string; corPrimaria: string | null; logoUrl: string | null };
+  conta?: {
+    nome: string;
+    corPrimaria: string | null;
+    logoUrl: string | null;
+    boasVindasAtivo?: boolean;
+    mensagemBoasVindas?: string | null;
+    agendaAtiva?: boolean;
+    planosAtivos?: boolean;
+    gamificacaoAtiva?: boolean;
+  };
 }
 
 export default function AppHome() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [trilhas, setTrilhas] = useState<TrilhaResumo[]>([]);
+  const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    try {
-      setDark(document.documentElement.classList.contains('dark'));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  function toggleTema() {
-    const d = document.documentElement.classList.toggle('dark');
-    setDark(d);
-    try {
-      localStorage.setItem('tribo_theme', d ? 'dark' : 'light');
-    } catch {
-      /* ignore */
-    }
-  }
+  const [boasVindas, setBoasVindas] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
-      const [m, ts] = await Promise.all([api<Me>('/me'), api<TrilhaResumo[]>('/app/trilhas')]);
+      const [m, ts, ofs] = await Promise.all([
+        api<Me>('/me'),
+        api<TrilhaResumo[]>('/app/trilhas'),
+        api<Oferta[]>('/app/ofertas').catch(() => []),
+      ]);
       setMe(m);
       setTrilhas(ts);
+      setOfertas(ofs);
+      // Modal de boas-vindas: mostra 1x por sessão do navegador.
+      if (m.conta?.boasVindasAtivo && m.conta.mensagemBoasVindas) {
+        try {
+          if (!sessionStorage.getItem('tribo_bv_visto')) {
+            setBoasVindas(m.conta.mensagemBoasVindas);
+            sessionStorage.setItem('tribo_bv_visto', '1');
+          }
+        } catch {
+          setBoasVindas(m.conta.mensagemBoasVindas);
+        }
+      }
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         clearToken();
@@ -71,44 +88,11 @@ export default function AppHome() {
   }, [router, carregar]);
 
   const cor = me?.conta?.corPrimaria || '#7c3aed';
-  const marca = me?.conta?.nome || 'Tribo Hub';
-  const iniciais = (me?.nome || '?')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
   const continuar = trilhas.find((t) => t.percentual > 0 && t.percentual < 100) ?? trilhas[0];
+  const emAndamento = trilhas.filter((t) => t.percentual > 0 && t.percentual < 100);
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      {/* Header white-label */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {me?.conta?.logoUrl ? (
-              <img src={me.conta.logoUrl} alt={marca} className="w-8 h-8 rounded-lg object-cover" />
-            ) : (
-              <div className="w-8 h-8 rounded-lg grid place-items-center text-white font-bold" style={{ backgroundColor: cor }}>
-                {marca[0]?.toUpperCase()}
-              </div>
-            )}
-            <span className="font-bold text-slate-900 dark:text-white">{marca}</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
-            <span style={{ color: cor }}>Início</span>
-            <Link href="/app/certificados" className="hover:text-slate-900 dark:hover:text-white">Certificados</Link>
-            <button onClick={() => { clearToken(); router.replace('/login'); }} className="hover:text-slate-900 dark:hover:text-white">Sair</button>
-          </nav>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleTema} title="Alternar tema" className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 grid place-items-center hover:bg-slate-200 dark:hover:bg-slate-600">
-              {dark ? '☀️' : '🌙'}
-            </button>
-            <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 grid place-items-center text-sm font-semibold">{iniciais}</div>
-          </div>
-        </div>
-      </header>
-
+    <main>
       <div className="max-w-6xl mx-auto px-5 py-8 space-y-10">
         {erro && <p className="text-sm text-rose-600">{erro}</p>}
 
@@ -128,6 +112,34 @@ export default function AppHome() {
           </Link>
         )}
 
+        {emAndamento.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Continue assistindo</h3>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {emAndamento.map((t) => (
+                <Link
+                  key={t.id}
+                  href={`/app/trilhas/ver?id=${t.id}`}
+                  className="shrink-0 w-60 ui-card overflow-hidden hover:shadow-md transition"
+                >
+                  {t.capaUrl ? (
+                    <img src={t.capaUrl} alt={t.titulo} className="h-24 w-full object-cover" />
+                  ) : (
+                    <div className="h-24" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
+                  )}
+                  <div className="p-3">
+                    <h4 className="font-semibold text-sm truncate">{t.titulo}</h4>
+                    <div className="mt-2 bg-slate-100 dark:bg-slate-700 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" style={{ width: `${t.percentual}%`, backgroundColor: cor }} />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{t.percentual}% · retomar →</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Meus cursos</h3>
           {carregando ? (
@@ -135,7 +147,7 @@ export default function AppHome() {
           ) : trilhas.length === 0 ? (
             <p className="text-slate-500 text-sm">Nenhum curso disponível ainda.</p>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {trilhas.map((t) => (
                 <Link
                   key={t.id}
@@ -143,9 +155,9 @@ export default function AppHome() {
                   className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition"
                 >
                   {t.capaUrl ? (
-                    <img src={t.capaUrl} alt={t.titulo} className="h-32 w-full object-cover" />
+                    <img src={t.capaUrl} alt={t.titulo} className="aspect-[2/3] w-full object-cover" />
                   ) : (
-                    <div className="h-32" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
+                    <div className="aspect-[2/3]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
                   )}
                   <div className="p-4">
                     <h4 className="font-semibold">{t.titulo}</h4>
@@ -161,7 +173,71 @@ export default function AppHome() {
             </div>
           )}
         </div>
+
+        {/* Ofertas (trilhas trancadas / vitrine) */}
+        {ofertas.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Descubra mais</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {ofertas.map((o) => (
+                <div key={o.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="relative">
+                    {o.capaUrl ? (
+                      <img src={o.capaUrl} alt={o.titulo} className="aspect-[2/3] w-full object-cover" />
+                    ) : (
+                      <div className="aspect-[2/3]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 grid place-items-center">
+                      <span className="text-4xl">🔒</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h4 className="font-semibold">{o.titulo}</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{o.descricao}</p>
+                    <div className="flex gap-2 mt-3">
+                      {o.checkoutUrl && (
+                        <a href={o.checkoutUrl} target="_blank" rel="noreferrer"
+                          className="flex-1 text-center text-white text-sm font-semibold py-2 rounded-lg" style={{ backgroundColor: cor }}>
+                          Comprar
+                        </a>
+                      )}
+                      {o.whatsappUrl && (
+                        <a href={o.whatsappUrl} target="_blank" rel="noreferrer"
+                          className="text-center text-sm font-semibold py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white" title="Falar no WhatsApp">
+                          WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal de boas-vindas */}
+      {boasVindas && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="overflow-y-auto p-6">
+              <div
+                className="prose-conteudo text-slate-800 dark:text-slate-100"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(boasVindas) }}
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+              <button
+                onClick={() => setBoasVindas(null)}
+                className="text-white text-sm font-semibold px-6 py-2 rounded-lg"
+                style={{ backgroundColor: cor }}
+              >
+                Começar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

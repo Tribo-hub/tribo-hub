@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { toast } from '../../../lib/toast';
 
 interface Certificado {
   id: string;
@@ -16,9 +16,12 @@ export default function CertificadosPage() {
   const router = useRouter();
   const [certs, setCerts] = useState<Certificado[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [cor, setCor] = useState('#7c3aed');
+  const [baixando, setBaixando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
+      api<{ conta?: { corPrimaria: string | null } }>('/me').then((m) => setCor(m.conta?.corPrimaria || '#7c3aed')).catch(() => {});
       setCerts(await api<Certificado[]>('/me/certificados'));
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -40,25 +43,19 @@ export default function CertificadosPage() {
   }, [router, carregar]);
 
   async function baixar(id: string) {
+    setBaixando(id);
     try {
       const res = await api<{ url: string }>(`/me/certificados/${id}/download`);
       window.open(res.url, '_blank');
-    } catch {
-      /* ignore */
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar o PDF');
+    } finally {
+      setBaixando(null);
     }
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-3xl mx-auto px-5 h-14 flex items-center justify-between">
-          <Link href="/app" className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white">
-            ← Minha área
-          </Link>
-          <span className="font-semibold">Meus certificados</span>
-        </div>
-      </header>
-
+    <main>
       <div className="max-w-3xl mx-auto px-5 py-8">
         {carregando ? (
           <p className="text-slate-500">Carregando...</p>
@@ -69,7 +66,7 @@ export default function CertificadosPage() {
             {certs.map((c) => (
               <div
                 key={c.id}
-                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-4 flex items-center justify-between"
+                className="ui-card px-5 py-4 flex items-center justify-between"
               >
                 <div>
                   <p className="font-semibold">{c.trilha.titulo}</p>
@@ -80,9 +77,11 @@ export default function CertificadosPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => baixar(c.id)}
-                    className="text-sm bg-tribo-600 hover:bg-tribo-700 text-white font-semibold px-3 py-1.5 rounded-lg"
+                    disabled={baixando === c.id}
+                    style={{ backgroundColor: cor }}
+                    className="text-sm hover:opacity-90 disabled:opacity-60 text-white font-semibold px-3 py-1.5 rounded-lg"
                   >
-                    Baixar PDF
+                    {baixando === c.id ? 'Gerando...' : 'Baixar PDF'}
                   </button>
                   <a
                     href={`/verificar/${c.codigoVerificacao}`}
