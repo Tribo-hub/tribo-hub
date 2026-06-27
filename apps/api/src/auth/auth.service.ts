@@ -10,7 +10,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { env } from '@tribohub/config';
 import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -33,18 +33,27 @@ export class AuthService {
   async login(email: string, senha: string, tenantSlug: string | null) {
     const emailNorm = email.trim().toLowerCase();
 
-    // Resolve a conta pelo subdomínio; sem tenant => contexto de super_admin (contaId null)
-    let contaId: string | null = null;
+    // Com tenant (subdomínio/código) restringe à conta; sem tenant resolve pelo e-mail (global).
+    let contaIdFiltro: string | null | undefined = undefined;
     if (tenantSlug) {
       const conta = await this.prisma.conta.findUnique({ where: { slug: tenantSlug } });
       if (!conta || !conta.ativo) throw new UnauthorizedException('Conta inválida');
-      contaId = conta.id;
+      contaIdFiltro = conta.id;
     }
 
-    const user = await this.prisma.usuario.findFirst({
-      where: { email: emailNorm, contaId },
+    const candidatos = await this.prisma.usuario.findMany({
+      where: contaIdFiltro !== undefined ? { email: emailNorm, contaId: contaIdFiltro } : { email: emailNorm },
+      include: { conta: { select: { ativo: true, sessaoUnica: true } } },
     });
-    if (!user) throw new UnauthorizedException('Credenciais inválidas');
+    if (candidatos.length === 0) throw new UnauthorizedException('Credenciais inválidas');
+
+    // O mesmo e-mail pode existir em mais de uma conta — desempata pela senha.
+    let user = candidatos[0];
+    if (candidatos.length > 1) {
+      const match = await this.primeiroComSenha(candidatos, senha);
+      if (!match) throw new UnauthorizedException('Credenciais inválidas');
+      user = match;
+    }
 
     if (user.bloqueadoAte && user.bloqueadoAte > new Date()) {
       throw new HttpException(
@@ -52,6 +61,7 @@ export class AuthService {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+    if (user.contaId && !user.conta?.ativo) throw new UnauthorizedException('Conta inválida');
     if (!user.ativo) throw new ForbiddenException('Usuário inativo');
 
     const ok = await bcrypt.compare(senha, user.senhaHash);
@@ -70,12 +80,19 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    const sessaoUnica = user.conta?.sessaoUnica ?? false;
+    const sid = sessaoUnica ? randomUUID() : undefined;
     await this.prisma.usuario.update({
       where: { id: user.id },
-      data: { tentativasFalhas: 0, bloqueadoAte: null, ultimoAcesso: new Date() },
+      data: {
+        tentativasFalhas: 0,
+        bloqueadoAte: null,
+        ultimoAcesso: new Date(),
+        ...(sid ? { sessaoAtual: sid } : {}),
+      },
     });
 
-    const tokens = await this.emitirTokens(user.id, user.role, user.contaId);
+    const tokens = await this.emitirTokens(user.id, user.role, user.contaId, sid);
     return {
       ...tokens,
       usuario: {
@@ -86,6 +103,14 @@ export class AuthService {
         contaId: user.contaId,
       },
     };
+  }
+
+  // Entre candidatos de mesmo e-mail (contas diferentes), retorna o que bate com a senha.
+  private async primeiroComSenha<T extends { senhaHash: string }>(lista: T[], senha: string): Promise<T | null> {
+    for (const u of lista) {
+      if (await bcrypt.compare(senha, u.senhaHash)) return u;
+    }
+    return null;
   }
 
   // Auto-cadastro do aluno (infoprodutor), quando a conta permite.
@@ -122,9 +147,20 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Refresh token inválido');
     }
-    const user = await this.prisma.usuario.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.usuario.findUnique({
+      where: { id: payload.sub },
+      include: { conta: { select: { sessaoUnica: true } } },
+    });
     if (!user || !user.ativo) throw new UnauthorizedException('Usuário inválido');
-    return this.emitirTokens(user.id, user.role, user.contaId);
+
+    let sid: string | undefined;
+    if (user.conta?.sessaoUnica) {
+      sid = user.sessaoAtual ?? randomUUID();
+      if (!user.sessaoAtual) {
+        await this.prisma.usuario.update({ where: { id: user.id }, data: { sessaoAtual: sid } });
+      }
+    }
+    return this.emitirTokens(user.id, user.role, user.contaId, sid);
   }
 
   async aceitarConvite(token: string, senha: string) {
@@ -142,6 +178,17 @@ export class AuthService {
       this.prisma.usuario.update({ where: { id: user.id }, data: { senhaHash, ativo: true } }),
       this.prisma.inviteToken.update({ where: { id: convite.id }, data: { usado: true } }),
     ]);
+    await this.prisma.notificacao
+      .create({
+        data: {
+          usuarioId: user.id,
+          contaId: convite.contaId,
+          titulo: 'Bem-vindo(a)! 👋',
+          mensagem: 'Sua conta foi ativada. Explore seus cursos e comece agora.',
+          tipo: 'convite',
+        },
+      })
+      .catch(() => undefined);
     return { ok: true };
   }
 
@@ -189,9 +236,10 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async emitirTokens(sub: string, role: string, contaId: string | null) {
+  private async emitirTokens(sub: string, role: string, contaId: string | null, sid?: string | null) {
+    const accessPayload = sid ? { sub, role, contaId, sid, su: true } : { sub, role, contaId };
     const accessToken = await this.jwt.signAsync(
-      { sub, role, contaId },
+      accessPayload,
       { secret: env.JWT_ACCESS_SECRET, expiresIn: env.JWT_ACCESS_EXPIRES },
     );
     const refreshToken = await this.jwt.signAsync(

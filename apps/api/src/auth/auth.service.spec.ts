@@ -11,6 +11,7 @@ const email = { recuperacaoSenha: jest.fn() } as any;
 function mkPrisma(user: any) {
   return {
     usuario: {
+      findMany: jest.fn().mockResolvedValue(user ? [user] : []),
       findFirst: jest.fn().mockResolvedValue(user),
       findUnique: jest.fn().mockResolvedValue(user),
       update: jest.fn().mockResolvedValue({}),
@@ -31,6 +32,7 @@ describe('AuthService.login', () => {
       tentativasFalhas: 0,
       role: 'aluno',
       contaId: 'c1',
+      conta: { ativo: true, sessaoUnica: false },
       nome: 'X',
       email: 'x@x.com',
     };

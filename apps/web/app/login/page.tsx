@@ -14,7 +14,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [tenant, setTenant] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
 
@@ -31,7 +30,7 @@ export default function LoginPage() {
     try {
       const res = await api<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, senha, ...(tenant ? { tenant } : {}) }),
+        body: JSON.stringify({ email, senha }),
       });
       setToken(res.accessToken);
       router.push(destino(res.usuario.role));
@@ -67,7 +66,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
         </div>
         <div>
@@ -77,19 +76,8 @@ export default function LoginPage() {
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             required
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
-        </div>
-        <div>
-          <label className="text-xs text-slate-500 dark:text-slate-400">Conta (subdomínio) — opcional</label>
-          <input
-            type="text"
-            value={tenant}
-            onChange={(e) => setTenant(e.target.value)}
-            placeholder="ex.: academia-do-trafego"
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
-          />
-          <p className="text-[11px] text-slate-400 mt-1">Alunos/gestores: informe a conta (em produção vem do endereço).</p>
         </div>
         <button
           type="submit"
