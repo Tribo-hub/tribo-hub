@@ -374,7 +374,8 @@ model XpEvento {
   id        String   @id @default(uuid())
   usuarioId String
   contaId   String
-  tipo      String // 'aula' | 'trilha' | 'plano_item'
+  trilhaId  String? // trilha a que o ponto pertence (null = sem trilha, ex.: plano da conta)
+  tipo      String // 'aula' | 'trilha' | 'plano_item' | 'quiz' | 'avaliacao' | 'comentario'
   refId     String
   xp        Int
   createdAt DateTime @default(now())
@@ -382,6 +383,7 @@ model XpEvento {
   @@unique([usuarioId, tipo, refId])
   @@index([contaId])
   @@index([usuarioId])
+  @@index([trilhaId])
   @@map("xp_eventos")
 }
 
@@ -405,6 +407,29 @@ model ConfigGamificacao {
   updatedAt    DateTime @updatedAt
 
   @@map("config_gamificacao")
+}
+
+// Override da config de gamificação por trilha (quando ausente, usa a config da conta).
+model ConfigGamificacaoTrilha {
+  trilhaId     String   @id
+  contaId      String
+  xpAula       Int      @default(10)
+  xpTrilha     Int      @default(100)
+  xpPlanoItem  Int      @default(5)
+  xpQuiz       Int      @default(0)
+  xpAvaliacao  Int      @default(0)
+  xpComentario Int      @default(0)
+  xpPorNivel   Int      @default(200)
+  badgeAulas1  Int      @default(1)
+  badgeAulas2  Int      @default(10)
+  badgeAulas3  Int      @default(50)
+  badgeCert1   Int      @default(1)
+  badgeCert2   Int      @default(3)
+  badgeNivel   Int      @default(5)
+  updatedAt    DateTime @updatedAt
+
+  @@index([contaId])
+  @@map("config_gamificacao_trilha")
 }
 
 // Quiz por aula (perguntas abertas; produtor vê as respostas dos alunos).
