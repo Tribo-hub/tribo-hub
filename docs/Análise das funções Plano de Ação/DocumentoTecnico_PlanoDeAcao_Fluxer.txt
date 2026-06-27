@@ -1,0 +1,503 @@
+# DOCUMENTO TÉCNICO — MÓDULO "PLANO DE AÇÃO" (FLUXER)
+## Para replicação por desenvolvedor
+
+---
+
+## 1. VISÃO GERAL DO SISTEMA
+
+O módulo Plano de Ação é um sistema de acompanhamento de tarefas estruturado com prazo, progressão e entrega. Ele conecta dois perfis: o ALUNO (quem executa as tarefas) e o ADMIN/MENTOR (quem cria e gerencia os planos).
+
+Lógica central:
+- O aluno só pode "entregar o plano" quando 100% das tarefas estiverem concluídas.
+- Após a entrega, o mentor grava uma análise que fica disponível para o aluno assistir.
+
+---
+
+## 2. ENTIDADES PRINCIPAIS (MODELOS DE DADOS)
+
+### 2.1 ActionPlan (Plano de Ação)
+
+| Campo             | Tipo           | Descrição                                               |
+|-------------------|----------------|---------------------------------------------------------|
+| id                | integer        | Identificador único                                     |
+| title             | string         | Nome do plano (ex: "Plano de ação #1")                  |
+| subtitle          | string         | Subtítulo temático (ex: "Ajuste de velas")              |
+| cover_image       | string (URL)   | Imagem de capa do card                                  |
+| deadline          | date           | Data limite para entrega                                |
+| released_at       | date           | Data em que o plano foi liberado para o aluno           |
+| status            | enum           | pending / submitted / reviewed                          |
+| order             | integer        | Número sequencial do plano (1, 2, 3...)                 |
+| review_video_url  | string (URL)   | URL do vídeo de análise pós-entrega                     |
+
+### 2.2 Task (Tarefa / Entregável)
+
+| Campo         | Tipo           | Descrição                                                              |
+|---------------|----------------|------------------------------------------------------------------------|
+| id            | integer        | Identificador único                                                    |
+| plan_id       | FK → ActionPlan| Plano ao qual pertence                                                 |
+| order         | integer        | Número de ordem da tarefa                                              |
+| title         | string         | Título da tarefa                                                       |
+| description   | text (rich)    | Descrição detalhada com instruções, links, vídeos incorporados         |
+| delivery_type | enum           | view_only / link / text / image / file                                 |
+| deadline      | date           | Data limite individual da tarefa                                       |
+| status        | enum           | pending / completed                                                    |
+
+### 2.3 TaskDelivery (Entrega da Tarefa)
+
+| Campo               | Tipo           | Descrição                                                   |
+|---------------------|----------------|-------------------------------------------------------------|
+| id                  | integer        | Identificador único                                         |
+| task_id             | FK → Task      | Tarefa entregue                                             |
+| user_id             | FK → User      | Aluno que entregou                                          |
+| links               | array[string]  | Lista de URLs entregues (para tipo link)                    |
+| text_content        | text           | Texto submetido (para tipo text)                            |
+| file_url            | string         | URL do arquivo (para tipo file/image)                       |
+| delivered_at        | datetime       | Timestamp da entrega                                        |
+| days_before_deadline| integer        | Calculado: deadline - delivered_at (pode ser negativo)      |
+
+### 2.4 UserPlanProgress (Progresso do Aluno no Plano)
+
+| Campo             | Tipo           | Descrição                                              |
+|-------------------|----------------|--------------------------------------------------------|
+| user_id           | FK → User      | Aluno                                                  |
+| plan_id           | FK → ActionPlan| Plano                                                  |
+| completed_tasks   | integer        | Contador de tarefas concluídas                         |
+| total_tasks       | integer        | Total de tarefas do plano                              |
+| percentage        | integer        | (completed / total) * 100                              |
+| submitted_at      | datetime       | Quando o plano foi entregue                            |
+| submission_status | enum           | not_submitted / submitted / approved                   |
+
+---
+
+## 3. TIPOS DE ENTREGÁVEL (delivery_type)
+
+### view_only
+O aluno apenas lê o conteúdo e confirma visualização.
+Não há campo de upload ou input.
+Modal de entrega exibe:
+  - Título: "Entregar: [Nome da Tarefa]"
+  - Subtítulo: "Leia o conteúdo na descrição da tarefa e confirme a visualização."
+  - Corpo: "Confirme que você visualizou o conteúdo solicitado."
+  - Botões: [Cancelar] [Enviar entrega ✓]
+
+### link
+O aluno submete uma ou mais URLs.
+Modal de entrega exibe:
+  - Título: "Entregar: [Nome da Tarefa]"
+  - Subtítulo: "Preencha os campos abaixo conforme o tipo de entrega necessário."
+  - Label: "Links"
+  - Input text dinâmico (placeholder: "https://exemplo.com")
+  - Botão: "+ Adicionar link" (adiciona novo campo input abaixo — array dinâmico)
+  - Botões: [Cancelar] [Enviar entrega ✓]
+
+### text (previsto na arquitetura)
+Input de texto livre para o aluno descrever a entrega.
+
+### image / file (previstos na arquitetura)
+Upload de arquivo direto no sistema.
+
+---
+
+## 4. FUNCIONALIDADES DO ALUNO
+
+### 4.1 Página de Listagem de Planos (/planos)
+
+Exibe um card por plano de ação cadastrado para o aluno.
+
+Cada card contém:
+- Número do plano (tipografia decorativa de fundo)
+- Avatar do mentor responsável
+- Título do plano
+- Progresso: "X de Y entregas concluídas" + barra de progresso visual + percentual numérico
+- Data de entrega com countdown dinâmico:
+  - Em andamento: "Faltam N dias"
+  - Entregue antes: "Entregue com N dias de antecedência"
+  - Entregue depois: "Entregue com N dias de atraso"
+
+Status visual por estado:
+- Plano em andamento: mostra data + countdown
+- Plano concluído: badge "Concluído" + botão "Assistir análise →" (revela ao clicar no card)
+
+Comportamento de clique:
+- Plano em andamento → navega para /plano/:id
+- Plano concluído → toggle in-place revelando botão "Assistir análise →" (sem navegação)
+
+### 4.2 Página de Detalhe do Plano (/plano/:id)
+
+HEADER / HERO:
+- Breadcrumb: Início > Plano > [Nome do Plano]
+- Badge de nível do aluno (ex: "Newbie") no canto superior direito
+- Título do plano ("Plano de ação #1")
+- Bloco de status (card roxo):
+  - Enquanto há tarefas pendentes: exibe "Conclua todas as tarefas do plano" + mensagem + botão "Entregar plano de ação #X" DESABILITADO (cinza)
+  - Quando tudo concluído: botão ATIVO (verde)
+
+SEÇÃO DE ENTREGÁVEIS (painel lateral direito fixo):
+- Título "Entregáveis" + botões de alternância de visualização (lista / grid)
+- Contador global: "0 de 18 tarefas concluídas (0%)"
+- Lista/Grid das tarefas (ver 4.2.1 e 4.2.2)
+- Card de entrega do plano ao final
+
+SEÇÃO DE METADADOS (corpo central, abaixo do hero):
+- Card "Prazo": data de entrega + badge com dias restantes
+- Card "Timeline do Plano": data de liberação do plano
+
+SEÇÃO "PLANOS DE AÇÃO" (lateral inferior):
+- Carrossel/slider com os planos disponíveis do programa
+- Cada item: avatar do mentor + número do plano
+- Indicador "Você está aqui" no plano atual do aluno
+
+### 4.2.1 Visualização em Lista (padrão)
+
+Cada item de tarefa exibe:
+- Checkbox de conclusão (botão — NÃO é input nativo, é button que abre modal)
+- Número de ordem
+- Ícone do tipo de entregável:
+  - 🔗 corrente para link
+  - 👁️ olho para view_only
+- Título truncado da tarefa (1 linha)
+- Preview truncado da descrição (1 linha)
+- Data limite
+
+Ao clicar em qualquer parte do item (exceto checkbox): abre Modal de Detalhe da Tarefa.
+
+### 4.2.2 Visualização em Grid
+
+- Cards menores em layout de 2 colunas
+- Exibe: número de ordem, ícone do tipo, título parcial, data
+- Mesma interação de clique para abrir modal
+- Alternância via botão de toggle no header "Entregáveis"
+
+### 4.2.3 Card de Entrega do Plano
+
+Aparece no final da lista/grid, dentro do painel de entregáveis:
+- Mensagem: "Finalize todas as tarefas para entregar o plano"
+- Botão "Entregar plano de ação #X":
+  - DESABILITADO (cinza) enquanto completed_tasks < total_tasks
+  - HABILITADO (verde) quando completed_tasks == total_tasks
+
+### 4.3 Modal de Detalhe da Tarefa
+
+Aberto ao clicar em qualquer tarefa.
+
+Estrutura:
+- Header: Título completo da tarefa + botão X para fechar
+- Linha de status: Tab "Visualização" (ativa) + Badge de status ("Pendente" ou "Concluído")
+- Prazo: data limite individual da tarefa
+- Botão "Entregar" (canto superior direito, verde): aciona o Modal de Submissão
+- Ícone de cópia da descrição (canto superior direito da seção de descrição)
+- Seção "Descrição": rich text com suporte a:
+  - Parágrafos com texto formatado
+  - Listas numeradas e com marcadores
+  - Emojis inline
+  - Links externos clicáveis (YouTube, Google Drive, etc.)
+  - Referências internas ao Academy da plataforma com links diretos
+  - Separadores visuais (linhas —————)
+  - Seções nomeadas (ex: "Como acessar o Academy")
+
+### 4.4 Modal de Submissão de Tarefa
+
+Varia conforme delivery_type da tarefa. Ver Seção 3 para detalhes completos de cada tipo.
+
+Fluxo após confirmação de "Enviar entrega":
+1. Task.status muda para completed
+2. TaskDelivery é criado com os dados enviados
+3. Checkbox da tarefa na lista é marcado como concluído (visual)
+4. Contador global atualiza: "X de 18 tarefas concluídas"
+5. Barra de progresso atualiza o percentual
+6. Quando completed == total: botão "Entregar plano" é habilitado
+
+### 4.5 Entrega do Plano Completo
+
+Fluxo ao clicar em "Entregar plano de ação #X":
+1. Sistema registra submitted_at no UserPlanProgress
+2. Calcula days_before_deadline = deadline - submitted_at
+3. ActionPlan.status → submitted
+4. Na listagem: card exibe badge "Concluído" + "Entregue com N dias de antecedência"
+5. Botão "Assistir análise →" BLOQUEADO até mentor subir o review_video_url
+6. Quando review_video_url preenchido: botão DESBLOQUEADO
+
+---
+
+## 5. FUNCIONALIDADES DO ADMIN/MENTOR
+
+### 5.1 Gestão de Planos
+
+Criar plano — campos obrigatórios:
+- Título (ex: "Plano de ação 1")
+- Subtítulo temático (ex: "Ajuste de velas")
+- Imagem de capa (cover_image)
+- Data de liberação (released_at)
+- Prazo de entrega (deadline)
+- Número de ordem (order)
+
+Atribuir plano a aluno(s):
+- Relacionamento user_plan vincula alunos ao plano
+- Na página do plano, o carrossel mostra quem está em qual plano com avatar + número
+- Múltiplos alunos podem estar no mesmo plano com progressos independentes
+
+Editar plano:
+- Modificar qualquer campo enquanto em rascunho ou ativo
+
+### 5.2 Gestão de Tarefas dentro do Plano
+
+Criar tarefa — campos:
+- Título
+- Descrição (rich text — ver suporte a formatos na seção 4.3)
+- Número de ordem
+- Prazo individual (deadline)
+- Tipo de entregável (delivery_type): view_only, link, text, file, image
+
+Reordenar tarefas:
+- Drag and drop ou campo de ordem numérica
+
+Definir tipo de entregável:
+- Campo delivery_type determina o formulário exibido ao aluno no modal de submissão
+
+Rich text da descrição suporta:
+- Texto formatado com negrito, itálico
+- Listas numeradas e com marcadores
+- Emojis
+- Links externos (YouTube, Google Drive, Hotmart, etc.)
+- Links internos ao Academy da plataforma
+- Separadores visuais
+- Seções com subtítulos
+- Instruções passo a passo
+
+### 5.3 Monitoramento de Progresso dos Alunos
+
+- Visualização de completed_tasks / total_tasks por aluno por plano
+- Identificação de quem está em qual plano via carrossel com avatares
+- Progresso individual independente por aluno
+
+### 5.4 Análise Pós-Entrega
+
+Após o aluno entregar o plano completo:
+1. Admin acessa as entregas (links, arquivos, confirmações) de cada tarefa via painel
+2. Admin assiste/revisa o que o aluno submeteu
+3. Admin grava vídeo de análise personalizado
+4. Admin sobe a URL do vídeo no campo review_video_url do plano
+5. Sistema desbloqueia automaticamente o botão "Assistir análise →" para o aluno
+6. ActionPlan.status → reviewed
+
+---
+
+## 6. FLUXO DE ESTADO COMPLETO
+
+[Admin cria Plano com campos: título, subtítulo, capa, released_at, deadline, order]
+        ↓
+[Admin cria Tarefas: título, descrição, order, deadline, delivery_type]
+        ↓
+[Plano liberado ao aluno na data released_at]
+        ↓
+[Aluno vê Plano na listagem /planos]
+  → Status: "em andamento" | progresso: "0 de N entregas concluídas" | "Faltam X dias"
+        ↓
+[Aluno clica no plano → navega para /plano/:id]
+        ↓
+[Aluno visualiza lista de tarefas ordenadas]
+        ↓
+[Aluno clica em uma tarefa → abre Modal de Detalhe]
+  → Lê descrição com instruções, links, vídeos
+        ↓
+[Aluno clica em "Entregar" → abre Modal de Submissão]
+  → Se delivery_type == view_only: apenas confirma visualização
+  → Se delivery_type == link: preenche 1 ou mais URLs
+  → Se delivery_type == text: escreve texto
+  → Se delivery_type == file/image: faz upload
+        ↓
+[Aluno clica "Enviar entrega"]
+  → Task.status = completed
+  → TaskDelivery criado com dados da entrega
+  → Contador global atualiza: "X de N tarefas concluídas"
+  → Barra de progresso atualiza
+        ↓
+[Repete para cada tarefa até completed == total]
+        ↓
+[Botão "Entregar plano de ação #X" HABILITADO]
+        ↓
+[Aluno clica "Entregar plano"]
+  → ActionPlan.status = submitted
+  → UserPlanProgress.submitted_at = now()
+  → days_before_deadline calculado
+        ↓
+[Card na listagem: badge "Concluído" + "Entregue com N dias de antecedência"]
+  → Botão "Assistir análise →" ainda bloqueado
+        ↓
+[Admin revisa todas as entregas do aluno]
+        ↓
+[Admin grava vídeo de análise + sobe review_video_url]
+  → ActionPlan.status = reviewed
+        ↓
+[Aluno vê botão "Assistir análise →" desbloqueado no card]
+        ↓
+[Aluno assiste análise do mentor]
+
+---
+
+## 7. REGRAS DE NEGÓCIO CRÍTICAS
+
+1. BLOQUEIO DE ENTREGA DO PLANO
+   - O botão "Entregar plano" APENAS é habilitado quando completed_tasks == total_tasks
+   - Qualquer tarefa pendente mantém o botão desabilitado/cinza
+   - Não há exceção ou bypass para essa regra
+
+2. MÚLTIPLOS LINKS POR TAREFA
+   - Formulário tipo "link" permite N links via botão "+ Adicionar link"
+   - Implementar como array dinâmico de inputs
+   - Armazenar como array[string] em TaskDelivery.links
+
+3. PRAZO DUPLO (individual vs. plano)
+   - Cada Task tem seu próprio deadline independente
+   - O ActionPlan tem um deadline global
+   - Exibir ambos nos locais corretos (tarefa no modal, plano no hero e na listagem)
+
+4. COUNTDOWN DINÂMICO (calculado em tempo real)
+   - Fórmula: dias_restantes = deadline - today
+   - Se positivo: "Faltam N dias"
+   - Se negativo: "N dias de atraso"
+   - Após entrega: "Entregue com N dias de antecedência" (se positivo) ou "Entregue com N dias de atraso" (se negativo)
+
+5. ANÁLISE CONDICIONAL
+   - O review_video_url só fica visível para o aluno APÓS ActionPlan.status = submitted
+   - Mesmo que o admin suba o vídeo antes, o aluno não vê até entregar
+
+6. PROGRESSO ISOLADO POR USUÁRIO
+   - UserPlanProgress é por (user_id, plan_id)
+   - Múltiplos alunos no mesmo plano têm progressos completamente independentes
+
+7. TIPO view_only = ENTREGA VÁLIDA
+   - A confirmação de visualização (sem nenhum input) já conta como tarefa 100% concluída
+   - Não requer nenhum dado adicional do aluno
+
+8. STATUS DAS TAREFAS
+   - Tarefa nunca fica "marcada" diretamente pelo checkbox
+   - O checkbox é um botão que SEMPRE abre o modal de submissão
+   - A marcação ocorre apenas após confirmação no modal
+
+---
+
+## 8. COMPONENTES DE UI A IMPLEMENTAR
+
+### PlanCard
+Descrição: Card da listagem /planos
+Props: title, subtitle, cover_image, order, completed_tasks, total_tasks, percentage, deadline, submission_status, review_video_url, mentor_avatar
+Estados: em_andamento | concluido_sem_analise | concluido_com_analise
+Comportamento: clique em andamento → navigate; clique concluído → toggle botão análise
+
+### TaskList
+Descrição: Lista vertical de tarefas com alternância para grid
+Props: tasks[], plan_status
+Item: checkbox (button), order, type_icon, title, description_preview, deadline
+Evento: onTaskClick(task_id) → abre TaskModal
+
+### TaskGrid
+Descrição: Grid 2 colunas das tarefas (view alternativa)
+Props: tasks[]
+Item: order, type_icon, title truncado, deadline
+Evento: onTaskClick(task_id) → abre TaskModal
+
+### TaskModal
+Descrição: Modal/Drawer com detalhe completo da tarefa
+Props: task (id, title, description, deadline, delivery_type, status)
+Seções: header (título + X), status badge, prazo, botão Entregar, ícone copiar, rich text descrição
+Evento: onDeliverClick → abre SubmitModal
+
+### SubmitModal
+Descrição: Modal de submissão dinâmico conforme delivery_type
+Props: task_id, task_title, delivery_type
+Renderiza conforme delivery_type:
+  - view_only: apenas confirmação + botão
+  - link: LinkInputGroup + botão
+  - text: textarea + botão
+  - file/image: file input + botão
+Evento: onSubmit(delivery_data) → POST /api/tasks/:id/deliver
+
+### LinkInputGroup
+Descrição: Grupo dinâmico de inputs de URL
+Props: value (array), onChange
+Funcionalidade: renderiza 1 input por item do array; botão "+ Adicionar link" faz push de string vazia; cada input tem botão remover
+Validação: cada URL deve começar com http:// ou https://
+
+### ProgressBar
+Descrição: Barra de progresso visual com percentual
+Props: percentage (0-100), completed, total
+Visual: barra verde com preenchimento proporcional + texto "X de Y tarefas concluídas (N%)"
+
+### PlanTimeline
+Descrição: Exibe datas importantes do plano
+Props: released_at, submitted_at (opcional), reviewed_at (opcional)
+Visual: linha do tempo vertical com ícones e datas
+
+### PlanCarousel
+Descrição: Carrossel horizontal de planos com avatares dos alunos
+Props: plans[], current_plan_id, users_progress[]
+Cada item: número do plano, avatar do aluno/mentor, indicador "Você está aqui" no plano atual
+
+### DeliverPlanCTA
+Descrição: Botão de entrega do plano completo com estado condicional
+Props: plan_id, completed_tasks, total_tasks, is_submitted
+Estado enabled: completed_tasks == total_tasks AND is_submitted == false
+Estado disabled: completed_tasks < total_tasks
+Estado submitted: já entregue — botão oculto ou mensagem de confirmação
+
+### ViewToggle
+Descrição: Alternância entre visualização lista e grid
+Props: currentView (list|grid), onChange
+Visual: dois ícones (lista / grid), ativo com destaque
+
+---
+
+## 9. ROTAS / ENDPOINTS SUGERIDOS (API REST)
+
+GET    /api/plans                           → Lista planos do usuário logado
+GET    /api/plans/:id                       → Detalhe de um plano com tarefas
+GET    /api/plans/:id/tasks                 → Lista tarefas de um plano
+POST   /api/tasks/:id/deliver               → Submete entrega de uma tarefa
+  Body: { delivery_type, links[], text_content, file_url }
+POST   /api/plans/:id/submit               → Entrega o plano completo
+GET    /api/plans/:id/progress             → Progresso do usuário no plano
+
+(Admin)
+POST   /api/admin/plans                    → Cria novo plano
+PUT    /api/admin/plans/:id                → Edita plano
+POST   /api/admin/plans/:id/tasks          → Cria tarefa no plano
+PUT    /api/admin/tasks/:id                → Edita tarefa
+DELETE /api/admin/tasks/:id               → Remove tarefa
+POST   /api/admin/plans/:id/review         → Sobe URL do vídeo de análise
+  Body: { review_video_url }
+GET    /api/admin/plans/:id/submissions    → Ver entregas dos alunos
+
+---
+
+## 10. EXEMPLO REAL DE PLANO MAPEADO
+
+Plano: "Plano de ação #1"
+Prazo: 15 de agosto de 2026
+Liberado em: 26 de junho de 2026
+Total de tarefas: 18
+
+TAREFA 1  | view_only | 29/jun | "Comece por aqui [Instruções na descrição]"
+TAREFA 2  | view_only | 29/jun | "Quem compartilha é quem mais cresce [Links Importantes]"
+TAREFA 3  | view_only | 29/jun | "Bônus exclusivos desbloqueados no Fluxo!"
+TAREFA 4  | view_only | 29/jun | "[BÔNUS] Análise de Instagram - Leia a descrição"
+TAREFA 5  | view_only | 03/jul | "Assistir aulas do Caixa Rápido"
+TAREFA 6  | view_only | 05/jul | "Criar o produto do Caixa Rápido"
+TAREFA 7  | view_only | 08/jul | "Subir o produto na Hotmart ou plataforma de vendas"
+TAREFA 8  | view_only | 11/jul | "Criar página de vendas curta para o produto de Caixa Rápido"
+TAREFA 9  | view_only | 13/jul | "Escrever, gravar e editar criativos do Caixa Rápido"
+TAREFA 10 | view_only | 16/jul | "Subir campanha do Caixa Rápido"
+TAREFA 11 | view_only | 20/jul | "Otimizar campanha de tráfego do Caixa Rápido"
+TAREFA 12 | view_only | 23/jul | "Assistir aula para Crescimento de Base no Instagram"
+TAREFA 13 | view_only | 27/jul | "5 Reels por semana [Crescimento da Base de seguidores]"
+TAREFA 14 | view_only | 30/jul | "1 carrossel por semana focado em Urgência Oculta"
+TAREFA 15 | view_only | 03/ago | "Impulsionar os melhores Conteúdos no Instagram"
+TAREFA 16 | view_only | 07/ago | "Como ver quantos seguidores vieram pelos reels e Custo do Storie 10x"
+TAREFA 17 | view_only | 13/ago | "Planilha ou Dash para acompanhar os dados de tráfego"
+TAREFA 18 | link      | 15/ago | "Mandar o print de faturamento atualizado"
+  → Entregável: link para pasta do Google Drive com prints de faturamento
+
+---
+
+Documento gerado em: 26/06/2026
+Plataforma analisada: Fluxer (flx.vendatodosantodia.com.br)

@@ -105,6 +105,13 @@ model Conta {
   dominioProprio String?   @unique
   ativo          Boolean   @default(true)
   permiteAutoCadastro Boolean @default(false) // infoprodutor: aluno pode se auto-cadastrar
+  permiteComentarios  Boolean @default(true) // comentários por aula (engajamento) — liga/desliga por conta
+  sessaoUnica         Boolean @default(false) // anti-compartilhamento: 1 sessão ativa por usuário
+  boasVindasAtivo     Boolean @default(false) // exibe modal de boas-vindas no app do aluno
+  mensagemBoasVindas  String? // conteúdo (HTML) do modal de boas-vindas
+  agendaAtiva         Boolean @default(false) // Onda C: agenda de eventos ao vivo (lives)
+  planosAtivos        Boolean @default(false) // Onda D: planos de ação (accountability)
+  gamificacaoAtiva    Boolean @default(false) // Onda E: XP, níveis e badges
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -133,6 +140,8 @@ model Usuario {
   contaId          String? // nulo apenas para super_admin
   nome             String
   email            String // lowercase; único por conta (ver @@unique)
+  telefone         String?
+  sessaoAtual      String? // id da sessão ativa (anti-compartilhamento)
   senhaHash        String
   role             Role
   ativo            Boolean   @default(true)
@@ -168,6 +177,12 @@ model Trilha {
   ordem            Int?
   proprietarioTipo ProprietarioConteudo @default(tenant)
   contaId          String? // nulo quando proprietarioTipo = plataforma
+  // Vitrine/oferta: exibir esta trilha (trancada) para alunos de outras trilhas
+  exibirComoOferta  Boolean @default(false)
+  ofertaTodosAlunos Boolean @default(false) // aparece para qualquer aluno da conta
+  ofertaParaTrilhas Json? // ids das trilhas cujos alunos veem esta como oferta
+  checkoutUrl       String? // link de compra/checkout
+  whatsappUrl       String? // link/numero de WhatsApp para falar com o produtor
   deletedAt        DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -201,27 +216,226 @@ model Modulo {
 }
 
 model Aula {
-  id              String    @id @default(uuid())
+  id              String     @id @default(uuid())
   moduloId        String
   titulo          String
   descricao       String?
-  tipoVideo       TipoVideo
-  videoUrl        String
+  tipoVideo       TipoVideo? // opcional: aula pode ser só de texto
+  videoUrl        String?
   videoIdExterno  String?
-  duracaoSegundos Int
+  duracaoSegundos Int        @default(0)
+  conteudoTexto   String? // bloco de conteúdo em texto/HTML (LMS+)
+  liberaAposDias  Int        @default(0) // drip content: libera N dias após início do acesso
+  anexos          Json? // materiais complementares: [{ nome, path }]
   materialUrl     String?
   legendaUrl      String?
   ordem           Int
-  publicado       Boolean   @default(false)
+  publicado       Boolean    @default(false)
   deletedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  modulo    Modulo      @relation(fields: [moduloId], references: [id])
-  progresso Progresso[]
+  modulo      Modulo           @relation(fields: [moduloId], references: [id])
+  progresso   Progresso[]
+  perguntas   QuizPergunta[]
+  comentarios ComentarioAula[]
 
   @@index([moduloId])
   @@map("aulas")
+}
+
+// Comentários por aula (alunos comentam; produtor responde/modera). Thread de 1 nível via respostaAId.
+model ComentarioAula {
+  id          String    @id @default(uuid())
+  aulaId      String
+  usuarioId   String
+  contaId     String
+  texto       String
+  respostaAId String? // resposta a outro comentário
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  aula      Aula             @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+  respostaA ComentarioAula?  @relation("RespostasComentario", fields: [respostaAId], references: [id], onDelete: Cascade)
+  respostas ComentarioAula[] @relation("RespostasComentario")
+
+  @@index([aulaId])
+  @@map("comentarios_aula")
+}
+
+// Onda C — eventos ao vivo (lives Zoom/Meet) por conta. trilhaId opcional restringe a audiência.
+model EventoAoVivo {
+  id         String   @id @default(uuid())
+  contaId    String
+  trilhaId   String? // null = todos os alunos da conta
+  titulo     String
+  descricao  String?
+  linkAcesso String
+  inicioEm   DateTime
+  duracaoMin Int      @default(60)
+  createdAt  DateTime @default(now())
+
+  @@index([contaId])
+  @@map("eventos_ao_vivo")
+}
+
+// Onda D — planos de ação (accountability de mentoria). Plano -> itens; aluno marca progresso.
+model PlanoAcao {
+  id           String    @id @default(uuid())
+  contaId      String
+  trilhaId     String? // null = todos os alunos da conta (audiência)
+  moduloId     String? // escopo organizacional opcional (contexto)
+  titulo       String
+  subtitulo    String? // subtítulo temático (ex: "Ajuste de velas")
+  descricao    String?
+  capaUrl      String? // caminho da capa no Storage (estilo card)
+  ordem        Int       @default(1) // nº sequencial do plano (#1, #2…)
+  prazoEm      DateTime? // prazo de entrega do plano (deadline)
+  releasedAt   DateTime? // data de liberação ao aluno (antes disso: bloqueado)
+  analiseAtiva Boolean   @default(false) // mentor decide se este plano terá análise escrita
+  createdAt    DateTime  @default(now())
+
+  itens    PlanoItem[]
+  entregas PlanoEntrega[]
+
+  @@index([contaId])
+  @@map("planos_acao")
+}
+
+enum PlanoItemTipo {
+  check // marcar concluído
+  assistir // assistir uma aula (conclui ao concluir a aula)
+  resumo // assistir uma aula e escrever um resumo
+  link // aluno entrega uma ou mais URLs (ex: Google Drive)
+}
+
+model PlanoItem {
+  id        String        @id @default(uuid())
+  planoId   String
+  titulo    String
+  descricao String? // instruções (texto + links)
+  tipo      PlanoItemTipo @default(check)
+  aulaId    String? // aula vinculada (tipos assistir/resumo)
+  prazoEm   DateTime?
+  ordem     Int           @default(1)
+  createdAt DateTime      @default(now())
+
+  plano     PlanoAcao            @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  progresso PlanoItemProgresso[]
+
+  @@index([planoId])
+  @@map("plano_itens")
+}
+
+model PlanoItemProgresso {
+  id          String    @id @default(uuid())
+  itemId      String
+  usuarioId   String
+  contaId     String
+  concluido   Boolean   @default(false)
+  texto       String? // resumo enviado pelo aluno (tipo resumo)
+  links       Json? // URLs entregues pelo aluno (tipo link)
+  concluidoEm DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  item PlanoItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, usuarioId])
+  @@index([itemId])
+  @@map("plano_item_progresso")
+}
+
+enum PlanoEntregaStatus {
+  submitted // aluno entregou o plano (aguardando análise, se houver)
+  reviewed // mentor registrou a análise
+}
+
+// Submissão do plano completo por aluno (gate de 100% + análise do mentor).
+model PlanoEntrega {
+  id               String             @id @default(uuid())
+  planoId          String
+  usuarioId        String
+  contaId          String
+  status           PlanoEntregaStatus @default(submitted)
+  submittedAt      DateTime           @default(now())
+  diasAntesDoPrazo Int? // prazo - submittedAt em dias (negativo = atraso)
+  analiseTexto     String? // análise escrita do mentor
+  analiseEm        DateTime?
+
+  plano PlanoAcao @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  @@unique([planoId, usuarioId])
+  @@index([planoId])
+  @@map("plano_entregas")
+}
+
+// Onda E — eventos de XP (ledger idempotente). tipo+refId evita pontuar 2x a mesma ação.
+model XpEvento {
+  id        String   @id @default(uuid())
+  usuarioId String
+  contaId   String
+  tipo      String // 'aula' | 'trilha' | 'plano_item'
+  refId     String
+  xp        Int
+  createdAt DateTime @default(now())
+
+  @@unique([usuarioId, tipo, refId])
+  @@index([contaId])
+  @@index([usuarioId])
+  @@map("xp_eventos")
+}
+
+// Config de gamificação por conta (produtor define os pontos do seu modelo). 1 por conta.
+model ConfigGamificacao {
+  contaId      String   @id
+  xpAula       Int      @default(10)
+  xpTrilha     Int      @default(100)
+  xpPlanoItem  Int      @default(5)
+  xpQuiz       Int      @default(0)
+  xpAvaliacao  Int      @default(0)
+  xpComentario Int      @default(0)
+  xpPorNivel   Int      @default(200)
+  // limiares dos badges fixos (só a quantidade é editável)
+  badgeAulas1  Int      @default(1) // Primeiros passos
+  badgeAulas2  Int      @default(10) // Maratonista
+  badgeAulas3  Int      @default(50) // Dedicado
+  badgeCert1   Int      @default(1) // Certificado!
+  badgeCert2   Int      @default(3) // Colecionador
+  badgeNivel   Int      @default(5) // Nível X
+  updatedAt    DateTime @updatedAt
+
+  @@map("config_gamificacao")
+}
+
+// Quiz por aula (perguntas abertas; produtor vê as respostas dos alunos).
+model QuizPergunta {
+  id        String   @id @default(uuid())
+  aulaId    String
+  pergunta  String
+  ordem     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  aula      Aula          @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+  respostas QuizResposta[]
+
+  @@index([aulaId])
+  @@map("quiz_perguntas")
+}
+
+model QuizResposta {
+  id         String   @id @default(uuid())
+  perguntaId String
+  usuarioId  String
+  contaId    String
+  resposta   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  pergunta QuizPergunta @relation(fields: [perguntaId], references: [id], onDelete: Cascade)
+
+  @@unique([perguntaId, usuarioId])
+  @@index([perguntaId])
+  @@map("quiz_respostas")
 }
 
 // ============================================================
@@ -235,6 +449,7 @@ model Progresso {
   contaId             String // redundante p/ queries multi-tenant eficientes
   concluido           Boolean   @default(false)
   percentualAssistido Decimal?  @db.Decimal(5, 2)
+  avaliacao           Int? // nota da aula dada pelo aluno (1-5)
   concluidoEm         DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -462,6 +677,51 @@ model PasswordResetToken {
 
   @@index([usuarioId])
   @@map("password_reset_tokens")
+}
+
+// Agentes de IA (modo link externo): produtor/super admin cadastram link de GPT/Claude/etc.
+model AgenteIA {
+  id               String               @id @default(uuid())
+  nome             String
+  descricao        String?
+  categoria        String?
+  icone            String? // emoji
+  url              String // link externo (abre em nova aba)
+  proprietarioTipo ProprietarioConteudo @default(tenant) // plataforma (Super Admin, corporativo global) | tenant (produtor)
+  contaId          String? // null quando plataforma
+  todasTrilhas     Boolean              @default(false) // tenant: aparece em todas as trilhas da conta
+  ativo            Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+
+  trilhas AgenteTrilha[]
+
+  @@index([contaId])
+  @@map("agentes_ia")
+}
+
+model AgenteTrilha {
+  agenteId String
+  trilhaId String
+
+  agente AgenteIA @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+
+  @@id([agenteId, trilhaId])
+  @@map("agentes_ia_trilhas")
+}
+
+// Notificações do usuário (sino no header).
+model Notificacao {
+  id        String   @id @default(uuid())
+  usuarioId String
+  contaId   String?
+  titulo    String
+  mensagem  String
+  tipo      String   @default("sistema") // matricula | certificado | convite | evento | sistema
+  lida      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId, lida])
+  @@map("notificacoes")
 }
 
 // Atalhos configuráveis no menu lateral do Super Admin (abrem em nova aba).
