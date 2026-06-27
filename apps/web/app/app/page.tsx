@@ -155,9 +155,9 @@ export default function AppHome() {
                   className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition"
                 >
                   {t.capaUrl ? (
-                    <img src={t.capaUrl} alt={t.titulo} className="aspect-[2/3] w-full object-cover" />
+                    <img src={t.capaUrl} alt={t.titulo} className="aspect-[4/5] w-full object-cover" />
                   ) : (
-                    <div className="aspect-[2/3]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
+                    <div className="aspect-[4/5]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
                   )}
                   <div className="p-4">
                     <h4 className="font-semibold">{t.titulo}</h4>
@@ -183,9 +183,9 @@ export default function AppHome() {
                 <div key={o.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="relative">
                     {o.capaUrl ? (
-                      <img src={o.capaUrl} alt={o.titulo} className="aspect-[2/3] w-full object-cover" />
+                      <img src={o.capaUrl} alt={o.titulo} className="aspect-[4/5] w-full object-cover" />
                     ) : (
-                      <div className="aspect-[2/3]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
+                      <div className="aspect-[4/5]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />
                     )}
                     <div className="absolute inset-0 bg-black/40 grid place-items-center">
                       <span className="text-4xl">🔒</span>
