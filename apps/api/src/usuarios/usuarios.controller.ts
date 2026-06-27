@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuariosService } from './usuarios.service';
@@ -11,8 +11,23 @@ class UpdateMeDto {
   nome?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  telefone?: string;
+
+  @IsOptional()
   @IsString()
   avatarUrl?: string;
+}
+
+class AvatarUploadDto {
+  @IsString()
+  @MaxLength(255)
+  nomeArquivo!: string;
 }
 
 @Controller('me')
@@ -28,5 +43,11 @@ export class UsuariosController {
   @Patch()
   updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
     return this.usuarios.updateMe(user.sub, dto);
+  }
+
+  // URL assinada para o próprio usuário (inclui aluno) subir o avatar.
+  @Post('avatar-upload-url')
+  avatarUploadUrl(@CurrentUser() user: AuthUser, @Body() dto: AvatarUploadDto) {
+    return this.usuarios.urlAvatarUpload(user, dto.nomeArquivo);
   }
 }

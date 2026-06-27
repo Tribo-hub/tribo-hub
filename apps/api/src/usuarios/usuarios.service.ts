@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -16,11 +17,24 @@ export class UsuariosService {
         id: true,
         nome: true,
         email: true,
+        telefone: true,
         role: true,
         contaId: true,
         avatarUrl: true,
         ultimoAcesso: true,
-        conta: { select: { tipoConta: true, nome: true, corPrimaria: true, logoUrl: true } },
+        conta: {
+          select: {
+            tipoConta: true,
+            nome: true,
+            corPrimaria: true,
+            logoUrl: true,
+            boasVindasAtivo: true,
+            mensagemBoasVindas: true,
+            agendaAtiva: true,
+            planosAtivos: true,
+            gamificacaoAtiva: true,
+          },
+        },
       },
     });
     if (!user) throw new NotFoundException('Usuário não encontrado');
@@ -32,14 +46,47 @@ export class UsuariosService {
         user.conta.logoUrl = null;
       }
     }
+    // avatar do aluno (caminho do Storage) -> assina p/ exibição
+    if (user.avatarUrl && !user.avatarUrl.startsWith('http')) {
+      try {
+        user.avatarUrl = (await this.storage.urlDeDownload(user.avatarUrl)).url;
+      } catch {
+        user.avatarUrl = null;
+      }
+    }
     return user;
   }
 
-  async updateMe(userId: string, data: { nome?: string; avatarUrl?: string }) {
+  async updateMe(userId: string, data: { nome?: string; email?: string; telefone?: string; avatarUrl?: string }) {
+    const atual = await this.prisma.usuario.findUnique({ where: { id: userId }, select: { contaId: true } });
+    if (!atual) throw new NotFoundException('Usuário não encontrado');
+
+    const email = data.email?.trim().toLowerCase();
+    if (email) {
+      const conflito = await this.prisma.usuario.findFirst({
+        where: { email, contaId: atual.contaId, NOT: { id: userId } },
+        select: { id: true },
+      });
+      if (conflito) throw new ConflictException('Este e-mail já está em uso nesta conta.');
+    }
+
     return this.prisma.usuario.update({
       where: { id: userId },
-      data: { nome: data.nome, avatarUrl: data.avatarUrl },
-      select: { id: true, nome: true, email: true, role: true, avatarUrl: true },
+      data: {
+        ...(data.nome !== undefined ? { nome: data.nome } : {}),
+        ...(email ? { email } : {}),
+        ...(data.telefone !== undefined ? { telefone: data.telefone || null } : {}),
+        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
+      },
+      select: { id: true, nome: true, email: true, telefone: true, role: true, avatarUrl: true },
     });
+  }
+
+  // URL assinada para o próprio usuário subir o avatar (qualquer papel, inclusive aluno).
+  async urlAvatarUpload(user: AuthUser, nomeArquivo: string) {
+    const base = user.contaId ?? 'plataforma';
+    const seguro = nomeArquivo.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${base}/avatares/${user.sub}-${Date.now()}-${seguro}`;
+    return this.storage.urlDeUpload(path);
   }
 }

@@ -8,11 +8,13 @@ import {
   Sun, Moon, LogOut, ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
+import { SinoNotificacoes } from './SinoNotificacoes';
 
 type Item = { href: string; label: string; icon: LucideIcon; exact?: boolean };
 
 interface Me {
   nome: string;
+  avatarUrl?: string | null;
   conta?: {
     nome: string;
     corPrimaria: string | null;
@@ -58,6 +60,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
 
   const cor = me?.conta?.corPrimaria || '#7c3aed';
   const marca = me?.conta?.nome || 'Tribo Hub';
+  const iniciais = (me?.nome || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
   const itens: Item[] = [
     { href: '/app', label: 'Início', icon: Home, exact: true },
@@ -70,7 +73,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
 
   return (
     <aside
-      className={`bg-slate-950 text-slate-300 h-screen overflow-y-auto flex flex-col shrink-0 z-50 w-64
+      className={`bg-slate-950 text-slate-300 h-screen flex flex-col shrink-0 z-50 w-64
         fixed top-0 left-0 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
         md:sticky md:translate-x-0 ${collapsed ? 'md:w-[4.5rem]' : 'md:w-64'}`}
     >
@@ -100,7 +103,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
         )}
       </div>
 
-      <nav className="p-2 space-y-1 text-sm flex-1">
+      <nav className="p-2 space-y-1 text-sm flex-1 overflow-y-auto">
         {itens.map((i) => {
           const on = i.exact ? pathname === i.href : pathname === i.href || pathname?.startsWith(i.href + '/');
           const Ic = i.icon;
@@ -123,6 +126,24 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
       </nav>
 
       <div className="p-2 border-t border-slate-800 space-y-1 text-sm">
+        {/* Perfil do aluno + notificações */}
+        <div className={`flex items-center gap-2 ${collapsed ? 'flex-col' : ''}`}>
+          <Link
+            href="/app/perfil"
+            onClick={onClose}
+            title="Meu perfil"
+            className={`flex items-center gap-2 min-w-0 rounded-lg hover:bg-slate-800 px-2 py-1.5 ${collapsed ? '' : 'flex-1'}`}
+          >
+            {me?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={me.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-700 grid place-items-center text-xs font-semibold text-white shrink-0">{iniciais}</div>
+            )}
+            {!collapsed && <span className="truncate text-slate-200">{me?.nome ?? 'Meu perfil'}</span>}
+          </Link>
+          <SinoNotificacoes placement="top-left" />
+        </div>
         <button
           onClick={toggleTheme}
           title="Alternar tema"

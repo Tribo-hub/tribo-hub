@@ -59,6 +59,27 @@ export async function uploadArquivo(pasta: string, file: File): Promise<string> 
   return path;
 }
 
+// Sobe o avatar do próprio usuário (acessível ao aluno) e devolve o caminho salvo.
+export async function uploadAvatar(file: File): Promise<string> {
+  const { path, signedUrl } = await api<{ path: string; token: string; signedUrl: string }>(
+    '/me/avatar-upload-url',
+    { method: 'POST', body: JSON.stringify({ nomeArquivo: file.name }) },
+  );
+  const res = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) throw new ApiError('Falha ao enviar a imagem', res.status);
+  return path;
+}
+
+// Gera uma URL assinada de leitura para um caminho do Storage (preview no painel).
+export async function urlAssinada(path: string): Promise<string> {
+  const { url } = await api<{ url: string }>(`/painel/upload/signed-download?path=${encodeURIComponent(path)}`);
+  return url;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
