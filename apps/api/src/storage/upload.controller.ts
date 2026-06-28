@@ -8,7 +8,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { StorageService } from './storage.service';
 
 class UploadUrlDto {
-  @IsIn(['videos', 'materiais', 'legendas', 'imagens'])
+  @IsIn(['videos', 'materiais', 'legendas', 'imagens', 'capas'])
   pasta!: string;
 
   @IsString()
