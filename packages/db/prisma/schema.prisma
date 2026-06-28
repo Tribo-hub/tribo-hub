@@ -85,6 +85,7 @@ enum TipoCobranca {
 
 enum StatusAssinatura {
   ativa
+  inadimplente
   suspensa
   cancelada
 }
@@ -653,6 +654,12 @@ model AssinaturaPlataforma {
   alunosIncluidos   Int?
   valorPorExcedente Decimal?         @db.Decimal(12, 2)
   status            StatusAssinatura @default(ativa)
+  // Ciclo de vida de cobrança (Fase 1) — marcadores idempotentes da máquina de estados.
+  inadimplenteDesde     DateTime? // data da 1ª fatura vencida não paga (âncora dos 15/30 dias)
+  ultimoEstadoBilling   String? // marcador do último aviso/transição já processado
+  ultimoEstadoBillingEm DateTime?
+  painelBloqueado       Boolean   @default(false) // 15 dias: bloqueia painel do produtor/empresa
+  alunosBloqueados      Boolean   @default(false) // 30 dias: bloqueia também os alunos
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -672,6 +679,8 @@ model FaturaPlataforma {
   valorExcedente Decimal      @default(0) @db.Decimal(12, 2)
   valorTotal     Decimal      @db.Decimal(12, 2)
   status         StatusFatura @default(pendente)
+  vencimentoEm   DateTime? // prazo de pagamento (base do contador de atraso)
+  metodoPagamento String? // pix | boleto | cartao | manual
   pagoEm         DateTime?
   txid           String? // id da cobrança Pix na Efí
   pixCopiaECola  String?
@@ -687,6 +696,7 @@ model FaturaPlataforma {
 
 enum StatusFatura {
   pendente
+  vencida
   paga
   cancelada
 }

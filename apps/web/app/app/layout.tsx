@@ -5,15 +5,19 @@ import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { api } from '../../lib/api';
 import { AlunoSidebar } from '../../components/AlunoSidebar';
+import { BloqueioInadimplencia } from '../../components/BloqueioInadimplencia';
 
-interface Me { conta?: { nome: string } }
+interface Me { conta?: { nome: string }; bloqueado?: boolean }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [marca, setMarca] = useState('Tribo Hub');
+  const [bloqueado, setBloqueado] = useState(false);
 
-  useEffect(() => { api<Me>('/me').then((m) => m.conta?.nome && setMarca(m.conta.nome)).catch(() => {}); }, []);
+  useEffect(() => {
+    api<Me>('/me').then((m) => { if (m.conta?.nome) setMarca(m.conta.nome); setBloqueado(!!m.bloqueado); }).catch(() => {});
+  }, []);
 
   // O player é imersivo (tela cheia), sem menu lateral.
   if (pathname?.startsWith('/app/player')) return <>{children}</>;
@@ -30,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <span className="font-semibold text-slate-900 dark:text-white truncate">{marca}</span>
         </div>
-        {children}
+        {bloqueado ? <BloqueioInadimplencia tipo="aluno" /> : children}
       </div>
     </div>
   );

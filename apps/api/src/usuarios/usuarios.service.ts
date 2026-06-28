@@ -55,7 +55,17 @@ export class UsuariosService {
         user.avatarUrl = null;
       }
     }
-    return user;
+
+    // Bloqueio por inadimplência (Fase 1): produtor a partir de 15d, aluno a partir de 30d.
+    let bloqueado = false;
+    if (user.contaId && user.role !== 'super_admin') {
+      const ass = await this.prisma.assinaturaPlataforma.findUnique({
+        where: { contaId: user.contaId },
+        select: { painelBloqueado: true, alunosBloqueados: true },
+      });
+      bloqueado = user.role === 'aluno' ? !!ass?.alunosBloqueados : !!ass?.painelBloqueado;
+    }
+    return { ...user, bloqueado };
   }
 
   async updateMe(userId: string, data: { nome?: string; email?: string; telefone?: string; avatarUrl?: string }) {

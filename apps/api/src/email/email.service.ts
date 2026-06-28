@@ -64,6 +64,11 @@ export class EmailService {
     return this.enviar(to, `Acesso liberado — ${curso}`, this.layout('Acesso liberado 🎉', corpo));
   }
 
+  // Aviso de cobrança / ciclo de vida da fatura (Fase 1).
+  async cobranca(to: string, titulo: string, corpo: string) {
+    return this.enviar(to, `${titulo} — Tribo Hub`, this.layout(titulo, corpo));
+  }
+
   // Recuperação de senha
   async recuperacaoSenha(to: string, nome: string, token: string) {
     const url = `${env.APP_URL}/redefinir-senha?token=${token}`;

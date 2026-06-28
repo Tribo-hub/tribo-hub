@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { PermitirInadimplente } from '../common/decorators/permitir-inadimplente.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuariosService } from './usuarios.service';
 
@@ -42,6 +43,7 @@ class AlterarSenhaDto {
 
 @Controller('me')
 @UseGuards(JwtAuthGuard)
+@PermitirInadimplente() // /me precisa carregar para a tela de bloqueio/alterar senha/sair
 export class UsuariosController {
   constructor(private readonly usuarios: UsuariosService) {}
 

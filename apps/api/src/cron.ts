@@ -34,6 +34,12 @@ async function run() {
       log.log(`Fechamento ${comp} concluído: ${r.quantidade} fatura(s).`);
     }
 
+    // Ciclo de vida da fatura: emite cobrança ao fechar, avisa, marca atraso e bloqueia (15/30 dias).
+    if (job === 'ciclo' || job === 'daily') {
+      const r = await app.get(BillingService, { strict: false }).processarCicloVida(new Date());
+      log.log(`Ciclo de vida processado: ${r.processadas} fatura(s) tocada(s).`);
+    }
+
     await app.close();
     process.exit(0);
   } catch (e) {

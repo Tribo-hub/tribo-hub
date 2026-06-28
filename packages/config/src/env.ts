@@ -45,6 +45,12 @@ const schema = z.object({
   EFI_CERTIFICATE_PATH: z.string().optional(),
   EFI_CERTIFICATE_BASE64: z.string().optional(), // cert .p12 em base64 (produção/Railway)
   EFI_SANDBOX: z.string().optional(),
+  EFI_WEBHOOK_HMAC: z.string().optional(), // valida o webhook Pix da Efí (opt-in)
+
+  // Ciclo de vida da cobrança (Fase 1) — defaults seguros, configuráveis sem deploy.
+  BILLING_DIAS_VENCIMENTO: z.coerce.number().int().positive().default(7),
+  BILLING_SUSPENSAO_PAINEL_DIAS: z.coerce.number().int().positive().default(15),
+  BILLING_SUSPENSAO_ALUNOS_DIAS: z.coerce.number().int().positive().default(30),
 });
 
 const parsed = schema.safeParse(process.env);

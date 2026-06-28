@@ -2,16 +2,22 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AgendaModule } from './agenda/agenda.module';
+import { AgentesModule } from './agentes/agentes.module';
+import { GamificacaoModule } from './gamificacao/gamificacao.module';
 import { AlunoModule } from './aluno/aluno.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
+import { SubscriptionStatusGuard } from './common/guards/subscription-status.guard';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
 import { CorporativoModule } from './corporativo/corporativo.module';
 import { EmailModule } from './email/email.module';
 import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
+import { NotificacoesModule } from './notificacoes/notificacoes.module';
+import { PlanosModule } from './planos/planos.module';
 import { StorageModule } from './storage/storage.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -31,9 +37,17 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     InfoprodutorModule,
     CorporativoModule,
     BillingModule,
+    NotificacoesModule,
+    AgentesModule,
+    AgendaModule,
+    PlanosModule,
+    GamificacaoModule,
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: SubscriptionStatusGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
