@@ -113,6 +113,7 @@ model Conta {
   agendaAtiva         Boolean @default(false) // Onda C: agenda de eventos ao vivo (lives)
   planosAtivos        Boolean @default(false) // Onda D: planos de ação (accountability)
   gamificacaoAtiva    Boolean @default(false) // Onda E: XP, níveis e badges
+  origemCadastro      String? // super_admin | autoatendimento (Fase 3b)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -693,6 +694,25 @@ model PlanoCatalogo {
   updatedAt         DateTime    @updatedAt
 
   @@map("planos_catalogo")
+}
+
+// Cupons de desconto (Fase 3b) — aplicados no autoatendimento ou pelo Super Admin.
+model CupomPlataforma {
+  id           String     @id @default(uuid())
+  codigo       String     @unique // sempre em caixa alta
+  descricao    String?
+  tipo         String // percentual | fixo
+  valor        Decimal    @db.Decimal(12, 2)
+  tipoConta    TipoConta? // null = vale para qualquer tipo de conta
+  duracaoMeses Int? // por quantos meses o desconto vigora (null = sem prazo)
+  maxUsos      Int? // null = ilimitado
+  usos         Int        @default(0)
+  validoAte    DateTime?
+  ativo        Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("cupons_plataforma")
 }
 
 // Notas internas por conta (suporte/financeiro) — Fase 2.

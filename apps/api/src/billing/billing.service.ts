@@ -1,9 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { StatusAssinatura, StatusFatura, TipoCobranca, TipoConta } from '@tribohub/db';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, StatusAssinatura, StatusFatura, TipoCobranca, TipoConta, Role } from '@tribohub/db';
 import { env } from '@tribohub/config';
+import { randomBytes } from 'crypto';
+import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { EfiService } from './efi.service';
+
+// slug a partir de um texto livre (mesma regra de ContasService)
+function slugify(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 100);
+}
 
 export function competenciaAtual(): string {
   const d = new Date();
@@ -11,6 +24,8 @@ export function competenciaAtual(): string {
 }
 
 const DIA_MS = 86_400_000;
+
+type PrismaTx = Prisma.TransactionClient;
 
 @Injectable()
 export class BillingService {
@@ -336,6 +351,158 @@ export class BillingService {
   async definirTrial(contaId: string, dias: number | null) {
     const trialAte = dias && dias > 0 ? new Date(Date.now() + dias * DIA_MS) : null;
     return this.prisma.assinaturaPlataforma.update({ where: { contaId }, data: { trialAte } });
+  }
+
+  // ===== Cupons (Fase 3b) =====
+  async listarCupons() {
+    return this.prisma.cupomPlataforma.findMany({ orderBy: [{ ativo: 'desc' }, { createdAt: 'desc' }] });
+  }
+  async criarCupom(dto: {
+    codigo: string; tipo: 'percentual' | 'fixo'; valor: number; descricao?: string;
+    tipoConta?: TipoConta | null; duracaoMeses?: number | null; maxUsos?: number | null; validoAte?: string | null;
+  }) {
+    const codigo = (dto.codigo || '').trim().toUpperCase();
+    if (!codigo) throw new BadRequestException('Código obrigatório');
+    if (!dto.valor || dto.valor <= 0) throw new BadRequestException('Valor inválido');
+    const existe = await this.prisma.cupomPlataforma.findUnique({ where: { codigo } });
+    if (existe) throw new ConflictException('Já existe um cupom com este código');
+    return this.prisma.cupomPlataforma.create({
+      data: {
+        codigo,
+        tipo: dto.tipo,
+        valor: dto.valor,
+        descricao: dto.descricao ?? null,
+        tipoConta: dto.tipoConta ?? null,
+        duracaoMeses: dto.duracaoMeses ?? null,
+        maxUsos: dto.maxUsos ?? null,
+        validoAte: dto.validoAte ? new Date(dto.validoAte) : null,
+      },
+    });
+  }
+  async atualizarCupom(id: string, dto: Record<string, unknown>) {
+    const data: Record<string, unknown> = {};
+    for (const k of ['tipo', 'valor', 'descricao', 'tipoConta', 'duracaoMeses', 'maxUsos', 'validoAte', 'ativo'] as const) {
+      if (dto[k] !== undefined) data[k] = k === 'validoAte' && dto[k] ? new Date(dto[k] as string) : dto[k];
+    }
+    return this.prisma.cupomPlataforma.update({ where: { id }, data });
+  }
+  async removerCupom(id: string) {
+    return this.prisma.cupomPlataforma.update({ where: { id }, data: { ativo: false } });
+  }
+
+  // Valida um cupom (uso público no checkout); lança erro amigável se inválido.
+  async validarCupom(codigoRaw: string, tipoConta?: TipoConta | null) {
+    const codigo = (codigoRaw || '').trim().toUpperCase();
+    if (!codigo) throw new BadRequestException('Informe o cupom');
+    const c = await this.prisma.cupomPlataforma.findUnique({ where: { codigo } });
+    if (!c || !c.ativo) throw new BadRequestException('Cupom inválido');
+    if (c.validoAte && c.validoAte.getTime() < Date.now()) throw new BadRequestException('Cupom expirado');
+    if (c.maxUsos != null && c.usos >= c.maxUsos) throw new BadRequestException('Cupom esgotado');
+    if (c.tipoConta && tipoConta && c.tipoConta !== tipoConta) throw new BadRequestException('Cupom não vale para este plano');
+    return c;
+  }
+
+  // Aplica o cupom à assinatura como desconto recorrente e incrementa o uso.
+  private async aplicarCupom(tx: PrismaTx, contaId: string, cupom: { id: string; codigo: string; tipo: string; valor: unknown; duracaoMeses: number | null }) {
+    const descontoAte = cupom.duracaoMeses && cupom.duracaoMeses > 0
+      ? new Date(Date.now() + cupom.duracaoMeses * 30 * DIA_MS)
+      : null;
+    await tx.assinaturaPlataforma.update({
+      where: { contaId },
+      data: {
+        descontoTipo: cupom.tipo,
+        descontoValor: cupom.valor as never,
+        descontoAte,
+        descontoMotivo: `Cupom ${cupom.codigo}`,
+      },
+    });
+    await tx.cupomPlataforma.update({ where: { id: cupom.id }, data: { usos: { increment: 1 } } });
+  }
+
+  // ===== Catálogo público (Fase 3b) =====
+  async catalogoPublico() {
+    const planos = await this.prisma.planoCatalogo.findMany({
+      where: { ativo: true },
+      orderBy: [{ tipoConta: 'asc' }, { valorBase: 'asc' }],
+      select: {
+        id: true, slug: true, nome: true, tipoConta: true, valorBase: true,
+        alunosIncluidos: true, valorPorExcedente: true, limiteUsuarios: true, recursos: true,
+      },
+    });
+    return planos;
+  }
+
+  // ===== Autoatendimento: cadastro do produtor/empresa + 1ª cobrança Pix =====
+  async signupProdutor(dto: {
+    marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string;
+  }) {
+    const nome = (dto.marca || '').trim();
+    const adminNome = (dto.adminNome || '').trim();
+    const emailNorm = (dto.adminEmail || '').trim().toLowerCase();
+    if (!nome || !adminNome || !emailNorm) throw new BadRequestException('Preencha os dados da conta');
+    if (!dto.senha || dto.senha.length < 8) throw new BadRequestException('A senha deve ter ao menos 8 caracteres');
+
+    const plano = await this.prisma.planoCatalogo.findFirst({ where: { id: dto.planoCatalogoId, ativo: true } });
+    if (!plano) throw new BadRequestException('Plano indisponível');
+
+    // valida o cupom antes de criar nada
+    const cupom = dto.cupom ? await this.validarCupom(dto.cupom, plano.tipoConta) : null;
+
+    const slug = await this.slugUnico(nome);
+    const senhaHash = await AuthService.hashSenha(dto.senha);
+    const ehInfo = plano.tipoConta === TipoConta.infoprodutor;
+
+    const conta = await this.prisma.$transaction(async (tx) => {
+      const emailEmUso = await tx.usuario.findFirst({ where: { email: emailNorm, contaId: null } });
+      if (emailEmUso) throw new ConflictException('E-mail já cadastrado');
+
+      const c = await tx.conta.create({
+        data: { nome, tipoConta: plano.tipoConta, slug, subdominio: slug, origemCadastro: 'autoatendimento' },
+      });
+      await tx.usuario.create({
+        data: { contaId: c.id, nome: adminNome, email: emailNorm, senhaHash, role: Role.admin_tenant },
+      });
+      await tx.assinaturaPlataforma.create({
+        data: {
+          contaId: c.id,
+          planoCatalogoId: plano.id,
+          plano: plano.nome,
+          tipoCobranca: ehInfo ? TipoCobranca.alunos_ativos : TipoCobranca.assentos,
+          valorBase: plano.valorBase,
+          alunosIncluidos: plano.alunosIncluidos ?? null,
+          valorPorExcedente: plano.valorPorExcedente ?? null,
+          limiteUsuarios: plano.limiteUsuarios ?? null,
+        },
+      });
+      if (cupom) await this.aplicarCupom(tx, c.id, cupom);
+      return c;
+    });
+
+    // 1ª fatura (competência atual) + cobrança Pix
+    const fatura = await this.fecharFatura(conta.id, competenciaAtual());
+    let pix: Awaited<ReturnType<BillingService['cobrar']>> | null = null;
+    if (Number(fatura.valorTotal) > 0) {
+      try { pix = await this.cobrar(fatura.id); } catch { /* Efí indisponível: cobra no ciclo */ }
+    }
+    return {
+      contaId: conta.id,
+      slug: conta.slug,
+      email: emailNorm,
+      faturaId: fatura.id,
+      valorTotal: Number(fatura.valorTotal),
+      pix,
+    };
+  }
+
+  private async slugUnico(base: string): Promise<string> {
+    const raiz = slugify(base) || 'conta';
+    let slug = raiz;
+    let n = 1;
+    while (await this.prisma.conta.findUnique({ where: { slug } })) {
+      n += 1;
+      slug = `${raiz}-${n}`;
+    }
+    return slug;
   }
 
   // Fatura em aberto (pendente/vencida) da conta — usada na tela de "regularize" do produtor.

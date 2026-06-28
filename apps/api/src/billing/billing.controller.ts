@@ -12,9 +12,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { timingSafeEqual } from 'crypto';
 import { env } from '@tribohub/config';
-import { Role } from '@tribohub/db';
+import { Role, TipoConta } from '@tribohub/db';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { PermitirInadimplente } from '../common/decorators/permitir-inadimplente.decorator';
@@ -162,6 +163,55 @@ export class BillingController {
   @Roles(Role.super_admin)
   definirTrial(@Param('id') id: string, @Body('dias') dias: number) {
     return this.billing.definirTrial(id, Number(dias));
+  }
+
+  // ===== Cupons (Super Admin) =====
+  @Get('admin/cupons')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  listarCupons() {
+    return this.billing.listarCupons();
+  }
+
+  @Post('admin/cupons')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  criarCupom(@Body() body: { codigo: string; tipo: 'percentual' | 'fixo'; valor: number; descricao?: string; tipoConta?: TipoConta | null; duracaoMeses?: number | null; maxUsos?: number | null; validoAte?: string | null }) {
+    return this.billing.criarCupom(body);
+  }
+
+  @Patch('admin/cupons/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  atualizarCupom(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.billing.atualizarCupom(id, body);
+  }
+
+  @Delete('admin/cupons/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  removerCupom(@Param('id') id: string) {
+    return this.billing.removerCupom(id);
+  }
+
+  // ===== Autoatendimento (público) =====
+  @Get('public/planos-catalogo')
+  catalogoPublico() {
+    return this.billing.catalogoPublico();
+  }
+
+  @Post('public/validar-cupom')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  validarCupom(@Body() body: { codigo: string; tipoConta?: TipoConta | null }) {
+    return this.billing.validarCupom(body.codigo, body.tipoConta ?? null);
+  }
+
+  @Post('public/signup-produtor')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  signupProdutor(@Body() body: { marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string }) {
+    return this.billing.signupProdutor(body);
   }
 
   // Produtor/Gestor: prévia da própria fatura do mês (acessível mesmo com painel bloqueado, p/ regularizar)
