@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api, uploadArquivo, urlAssinada } from '../lib/api';
+import { RichTextField } from './RichTextField';
+
+const DESC_MAX = 600;
 
 interface TrilhaCfg {
   id: string;
+  descricao: string;
   capaUrl: string | null;
   exibirComoOferta: boolean;
   ofertaTodosAlunos: boolean;
@@ -16,6 +20,7 @@ interface TrilhaItem { id: string; titulo: string }
 
 // Configurações de capa (estilo Netflix, 2:3) e de vitrine/oferta da trilha.
 export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: () => void }) {
+  const [descricao, setDescricao] = useState(trilha.descricao ?? '');
   const [capaPath, setCapaPath] = useState<string | null>(trilha.capaUrl);
   const [preview, setPreview] = useState<string | null>(null);
   const [exibir, setExibir] = useState(trilha.exibirComoOferta);
@@ -67,6 +72,7 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
     await api(`/painel/trilhas/${trilha.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        descricao,
         capaUrl: capaPath ?? undefined,
         exibirComoOferta: exibir,
         ofertaTodosAlunos: todos,
@@ -84,6 +90,19 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
   return (
     <div className="ui-card p-5 mb-6 space-y-5">
       <h2 className="font-semibold">Configurações da trilha</h2>
+
+      {/* Descrição (editor de texto rico, com limite) */}
+      <div>
+        <p className="text-sm font-medium mb-1">Descrição</p>
+        <p className="text-xs text-slate-400 mb-2">Use o editor para formatar (negrito, listas, títulos). Mantenha curta para o layout ficar melhor.</p>
+        <RichTextField
+          value={descricao}
+          onChange={setDescricao}
+          maxLength={DESC_MAX}
+          alturaPreview="h-[140px]"
+          placeholder="Descreva a trilha em poucas linhas"
+        />
+      </div>
 
       {/* Capa */}
       <div className="flex gap-4">

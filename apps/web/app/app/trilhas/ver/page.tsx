@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
+import { sanitizeHtml } from '../../../../lib/sanitize';
 
 interface Aula {
   id: string;
@@ -102,7 +103,7 @@ export default function TrilhaOverview() {
             </Link>
           )}
         </div>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">{trilha.descricao}</p>
+        <div className="prose-conteudo text-slate-500 dark:text-slate-400 mt-1 max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(trilha.descricao || '') }} />
         <div className="mt-4 flex items-center gap-3">
           <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
             <div className="h-2.5 rounded-full" style={{ width: `${percentual}%`, backgroundColor: cor }} />

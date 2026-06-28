@@ -1,12 +1,25 @@
 import { CategoriaTrilha, TipoVideo } from '@tribohub/db';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+export class AnexoDto {
+  @IsString()
+  @MaxLength(255)
+  nome!: string;
+
+  @IsString()
+  path!: string;
+}
 
 export class CreateTrilhaDto {
   @IsString()
@@ -14,6 +27,7 @@ export class CreateTrilhaDto {
   titulo!: string;
 
   @IsString()
+  @MaxLength(4000)
   descricao!: string;
 
   @IsOptional()
@@ -33,6 +47,7 @@ export class UpdateTrilhaDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(4000)
   descricao?: string;
 
   @IsOptional()
@@ -41,6 +56,33 @@ export class UpdateTrilhaDto {
 
   @IsOptional()
   publicado?: boolean;
+
+  @IsOptional()
+  @IsString()
+  capaUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  exibirComoOferta?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  ofertaTodosAlunos?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ofertaParaTrilhas?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  checkoutUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  whatsappUrl?: string;
 }
 
 export class CreateModuloDto {
@@ -82,23 +124,57 @@ export class CreateAulaDto {
   @IsString()
   descricao?: string;
 
+  @IsOptional()
   @IsEnum(TipoVideo)
-  tipoVideo!: TipoVideo;
+  tipoVideo?: TipoVideo;
 
+  @IsOptional()
   @IsString()
-  videoUrl!: string;
+  videoUrl?: string;
 
   @IsOptional()
   @IsString()
   videoIdExterno?: string;
 
+  @IsOptional()
+  @IsString()
+  conteudoTexto?: string;
+
+  @IsOptional()
   @IsInt()
-  @Min(1)
-  duracaoSegundos!: number;
+  @Min(0)
+  liberaAposDias?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  duracaoSegundos?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnexoDto)
+  anexos?: AnexoDto[];
 
   @IsInt()
   @Min(1)
   ordem!: number;
+}
+
+export class CriarPerguntaDto {
+  @IsString()
+  @MaxLength(500)
+  pergunta!: string;
+}
+
+export class ResponderComentarioDto {
+  @IsString()
+  @MaxLength(2000)
+  texto!: string;
+
+  @IsOptional()
+  @IsString()
+  respostaAId?: string;
 }
 
 export class UpdateAulaDto {
@@ -124,9 +200,24 @@ export class UpdateAulaDto {
   videoIdExterno?: string;
 
   @IsOptional()
+  @IsString()
+  conteudoTexto?: string;
+
+  @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
+  liberaAposDias?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   duracaoSegundos?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnexoDto)
+  anexos?: AnexoDto[];
 
   @IsOptional()
   @IsInt()

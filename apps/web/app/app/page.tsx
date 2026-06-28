@@ -193,7 +193,7 @@ export default function AppHome() {
                   </div>
                   <div className="p-4">
                     <h4 className="font-semibold">{o.titulo}</h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{o.descricao}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{(o.descricao || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ')}</p>
                     <div className="flex gap-2 mt-3">
                       {o.checkoutUrl && (
                         <a href={o.checkoutUrl} target="_blank" rel="noreferrer"

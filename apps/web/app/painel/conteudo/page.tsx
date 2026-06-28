@@ -74,7 +74,7 @@ export default function ConteudoPage() {
                 <Link
                   key={t.id}
                   href={`/painel/conteudo/editar?id=${t.id}`}
-                  className="block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-3 hover:shadow-sm"
+                  className="block ui-card px-5 py-3 hover:shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{t.titulo}</p>
@@ -95,7 +95,7 @@ export default function ConteudoPage() {
           )}
         </section>
 
-        <aside className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 h-fit">
+        <aside className="ui-card p-5 h-fit">
           <h2 className="font-semibold mb-3">Nova trilha</h2>
           <form onSubmit={criar} className="space-y-3">
             <input
@@ -103,20 +103,21 @@ export default function ConteudoPage() {
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
               required
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <textarea
-              placeholder="Descrição"
+              placeholder="Descrição (você pode formatar depois, ao editar a trilha)"
               value={form.descricao}
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
               required
               rows={3}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              maxLength={600}
+              className="w-full ui-input"
             />
             <select
               value={form.categoria}
               onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             >
               {CATEGORIAS.map((c) => (
                 <option key={c} value={c}>
