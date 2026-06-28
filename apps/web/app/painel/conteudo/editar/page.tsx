@@ -60,6 +60,8 @@ export default function TrilhaDetalhePage() {
   const [editAberto, setEditAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<{ tipo: 'modulos' | 'aulas'; id: string } | null>(null);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // módulos expandidos (padrão: lista fechada)
+  const [editMod, setEditMod] = useState<string | null>(null);
+  const [tituloMod, setTituloMod] = useState('');
 
   function toggleModulo(mid: string) {
     setAbertos((s) => {
@@ -67,6 +69,21 @@ export default function TrilhaDetalhePage() {
       if (n.has(mid)) n.delete(mid); else n.add(mid);
       return n;
     });
+  }
+
+  // Salva o novo título do módulo (otimista + persiste em segundo plano).
+  async function salvarTituloModulo(mid: string) {
+    const novo = tituloMod.trim();
+    if (!novo) { setEditMod(null); return; }
+    setTrilha((t) => (t ? { ...t, modulos: t.modulos.map((m) => (m.id === mid ? { ...m, titulo: novo } : m)) } : t));
+    setEditMod(null);
+    try {
+      await api(`/painel/modulos/${mid}`, { method: 'PATCH', body: JSON.stringify({ titulo: novo }) });
+      toast.success('Módulo salvo.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
+      carregar();
+    }
   }
 
   const carregar = useCallback(async () => {
@@ -214,13 +231,28 @@ export default function TrilhaDetalhePage() {
               <div className={`px-5 py-3 flex items-center justify-between ${aberto ? 'border-b border-slate-100 dark:border-slate-700' : ''}`}>
                 <span className="font-semibold flex items-center gap-2 min-w-0">
                   <span draggable onDragStart={() => setArrastando({ tipo: 'modulos', id: m.id })} onDragEnd={() => setArrastando(null)} title="Arrastar para reordenar" className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 shrink-0"><GripVertical size={16} /></span>
-                  <button type="button" onClick={() => toggleModulo(m.id)} className="flex items-center gap-2 min-w-0 hover:text-tribo-600" title={aberto ? 'Recolher' : 'Expandir'}>
-                    {aberto ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
-                    <span className="truncate">{m.ordem}. {m.titulo}</span>
-                  </button>
-                  <span className="text-xs font-normal text-slate-400 shrink-0">{m.aulas.length} aula(s)</span>
+                  {editMod === m.id ? (
+                    <span className="flex items-center gap-2 flex-1 min-w-0">
+                      <input
+                        autoFocus
+                        value={tituloMod}
+                        onChange={(e) => setTituloMod(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') salvarTituloModulo(m.id); if (e.key === 'Escape') setEditMod(null); }}
+                        className="flex-1 min-w-0 ui-input py-1 text-sm font-normal"
+                      />
+                      <button type="button" onClick={() => salvarTituloModulo(m.id)} className="text-xs font-semibold text-tribo-600 dark:text-tribo-400 shrink-0">salvar</button>
+                      <button type="button" onClick={() => setEditMod(null)} className="text-xs text-slate-400 shrink-0">cancelar</button>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => toggleModulo(m.id)} className="flex items-center gap-2 min-w-0 hover:text-tribo-600" title={aberto ? 'Recolher' : 'Expandir'}>
+                      {aberto ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
+                      <span className="truncate">{m.ordem}. {m.titulo}</span>
+                    </button>
+                  )}
+                  {editMod !== m.id && <span className="text-xs font-normal text-slate-400 shrink-0">{m.aulas.length} aula(s)</span>}
                 </span>
                 <div className="flex items-center gap-0.5 text-slate-400">
+                  <button onClick={() => { setEditMod(m.id); setTituloMod(m.titulo); }} title="Editar título" className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-tribo-600"><Pencil size={16} /></button>
                   <button disabled={mi === 0} onClick={() => mover('modulos', m, trilha.modulos[mi - 1])} title="Subir" className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-tribo-600"><ChevronUp size={16} /></button>
                   <button disabled={mi === trilha.modulos.length - 1} onClick={() => mover('modulos', m, trilha.modulos[mi + 1])} title="Descer" className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-tribo-600"><ChevronDown size={16} /></button>
                   <button onClick={() => { if (confirm(`Remover o módulo "${m.titulo}" e todas as suas aulas? Esta ação não pode ser desfeita.`)) call(`/painel/modulos/${m.id}`, { method: 'DELETE' }); }} title="Remover módulo" className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30"><Trash2 size={16} /></button>
