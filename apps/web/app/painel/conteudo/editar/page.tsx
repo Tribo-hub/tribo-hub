@@ -12,6 +12,7 @@ import { AnexosField, type Anexo } from '../../../../components/AnexosField';
 import { TrilhaConfig } from '../../../../components/TrilhaConfig';
 import { AulaEditor } from '../../../../components/AulaEditor';
 import { sanitizeHtml } from '../../../../lib/sanitize';
+import { toast } from '../../../../lib/toast';
 import { Pencil, Brain, MessageSquare, ChevronUp, ChevronDown, Trash2, GripVertical } from 'lucide-react';
 
 interface Aula {
@@ -82,12 +83,15 @@ export default function TrilhaDetalhePage() {
     carregar();
   }, [router, carregar]);
 
-  async function call(path: string, opts: RequestInit) {
+  async function call(path: string, opts: RequestInit, okMsg?: string) {
     try {
       await api(path, opts);
+      if (okMsg) toast.success(okMsg);
       await carregar();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro');
+      const msg = err instanceof Error ? err.message : 'Erro';
+      setErro(msg);
+      toast.error(msg);
     }
   }
 
@@ -214,7 +218,7 @@ export default function TrilhaDetalhePage() {
                   call(`/painel/modulos/${m.id}/aulas`, {
                     method: 'POST',
                     body: JSON.stringify({ ...dto, ordem: m.aulas.length + 1 }),
-                  })
+                  }, 'Aula salva.')
                 }
               />
             </div>
@@ -228,7 +232,7 @@ export default function TrilhaDetalhePage() {
             call(`/painel/trilhas/${id}/modulos`, {
               method: 'POST',
               body: JSON.stringify({ titulo: novoModulo, ordem: trilha.modulos.length + 1 }),
-            });
+            }, 'Módulo salvo.');
             setNovoModulo('');
           }}
           className="mt-5 flex gap-2"
