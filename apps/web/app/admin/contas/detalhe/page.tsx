@@ -268,8 +268,8 @@ export default function ContaDetalhe() {
           <button className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar plano</button>
         </form>
 
-        {/* Financeiro: desconto, cobrança avulsa e notas */}
-        <ContaFinanceiro contaId={id} />
+        {/* Financeiro: plano do catálogo, trial, desconto, cobrança avulsa e notas */}
+        <ContaFinanceiro contaId={id} onChanged={carregar} />
 
         {/* Usuários */}
         <div className="ui-card">

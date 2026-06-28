@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { StatusAssinatura, StatusFatura, TipoConta } from '@tribohub/db';
+import { StatusAssinatura, StatusFatura, TipoCobranca, TipoConta } from '@tribohub/db';
 import { env } from '@tribohub/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -286,6 +286,58 @@ export class BillingService {
     return { ok: true };
   }
 
+  // ===== Catálogo de planos (Fase 3) =====
+  async listarCatalogo() {
+    return this.prisma.planoCatalogo.findMany({ orderBy: [{ ativo: 'desc' }, { valorBase: 'asc' }] });
+  }
+  async criarCatalogo(dto: {
+    slug: string; nome: string; tipoConta: TipoConta; valorBase: number;
+    alunosIncluidos?: number | null; valorPorExcedente?: number | null; limiteUsuarios?: number | null;
+  }) {
+    return this.prisma.planoCatalogo.create({
+      data: {
+        slug: dto.slug, nome: dto.nome, tipoConta: dto.tipoConta, valorBase: dto.valorBase,
+        alunosIncluidos: dto.alunosIncluidos ?? null,
+        valorPorExcedente: dto.valorPorExcedente ?? null,
+        limiteUsuarios: dto.limiteUsuarios ?? null,
+      },
+    });
+  }
+  async atualizarCatalogo(id: string, dto: Record<string, unknown>) {
+    const data: Record<string, unknown> = {};
+    for (const k of ['slug', 'nome', 'tipoConta', 'valorBase', 'alunosIncluidos', 'valorPorExcedente', 'limiteUsuarios', 'ativo'] as const) {
+      if (dto[k] !== undefined) data[k] = dto[k];
+    }
+    return this.prisma.planoCatalogo.update({ where: { id }, data });
+  }
+  async removerCatalogo(id: string) {
+    return this.prisma.planoCatalogo.update({ where: { id }, data: { ativo: false } });
+  }
+
+  // Aplica um plano do catálogo à assinatura de uma conta (copia os valores).
+  async aplicarPlano(contaId: string, planoCatalogoId: string) {
+    const p = await this.prisma.planoCatalogo.findUnique({ where: { id: planoCatalogoId } });
+    if (!p) throw new NotFoundException('Plano não encontrado');
+    return this.prisma.assinaturaPlataforma.update({
+      where: { contaId },
+      data: {
+        planoCatalogoId: p.id,
+        plano: p.nome,
+        tipoCobranca: p.tipoConta === TipoConta.infoprodutor ? TipoCobranca.alunos_ativos : TipoCobranca.assentos,
+        valorBase: p.valorBase,
+        alunosIncluidos: p.alunosIncluidos ?? null,
+        valorPorExcedente: p.valorPorExcedente ?? null,
+        limiteUsuarios: p.limiteUsuarios ?? null,
+      },
+    });
+  }
+
+  // Trial manual: define quantos dias de cortesia (0/null remove o trial).
+  async definirTrial(contaId: string, dias: number | null) {
+    const trialAte = dias && dias > 0 ? new Date(Date.now() + dias * DIA_MS) : null;
+    return this.prisma.assinaturaPlataforma.update({ where: { contaId }, data: { trialAte } });
+  }
+
   // Fatura em aberto (pendente/vencida) da conta — usada na tela de "regularize" do produtor.
   async faturaAbertaDaConta(contaId: string) {
     return this.prisma.faturaPlataforma.findFirst({
@@ -312,6 +364,8 @@ export class BillingService {
     for (const f of faturas) {
       const ass = f.conta.assinatura;
       if (!ass || ass.status === StatusAssinatura.cancelada) continue;
+      // Em período de trial: não cobra, não avisa, não suspende.
+      if (ass.trialAte && ass.trialAte.getTime() > hoje.getTime()) continue;
 
       // 1) Fatura recém-fechada: emite a cobrança Pix, define o vencimento e avisa.
       if (!f.vencimentoEm) {

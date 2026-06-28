@@ -119,6 +119,51 @@ export class BillingController {
     return this.billing.removerNota(notaId);
   }
 
+  // ===== Catálogo de planos (Super Admin) =====
+  @Get('admin/planos-catalogo')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  listarCatalogo() {
+    return this.billing.listarCatalogo();
+  }
+
+  @Post('admin/planos-catalogo')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  criarCatalogo(@Body() body: { slug: string; nome: string; tipoConta: 'infoprodutor' | 'corporativo'; valorBase: number; alunosIncluidos?: number | null; valorPorExcedente?: number | null; limiteUsuarios?: number | null }) {
+    return this.billing.criarCatalogo(body as never);
+  }
+
+  @Patch('admin/planos-catalogo/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  atualizarCatalogo(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.billing.atualizarCatalogo(id, body);
+  }
+
+  @Delete('admin/planos-catalogo/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  removerCatalogo(@Param('id') id: string) {
+    return this.billing.removerCatalogo(id);
+  }
+
+  // Aplica um plano do catálogo a uma conta
+  @Post('admin/contas/:id/aplicar-plano')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  aplicarPlano(@Param('id') id: string, @Body('planoCatalogoId') planoCatalogoId: string) {
+    return this.billing.aplicarPlano(id, planoCatalogoId);
+  }
+
+  // Trial manual por conta (dias)
+  @Post('admin/contas/:id/trial')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  definirTrial(@Param('id') id: string, @Body('dias') dias: number) {
+    return this.billing.definirTrial(id, Number(dias));
+  }
+
   // Produtor/Gestor: prévia da própria fatura do mês (acessível mesmo com painel bloqueado, p/ regularizar)
   @Get('painel/minha-fatura')
   @UseGuards(JwtAuthGuard, RolesGuard)

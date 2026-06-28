@@ -6,20 +6,45 @@ import { toast } from '../lib/toast';
 import { CopyButton } from './CopyButton';
 
 interface Nota { id: string; texto: string; createdAt: string }
+interface PlanoCat { id: string; nome: string; tipoConta: string; valorBase: string; ativo: boolean }
 
-// Bloco financeiro do detalhe da conta (Super Admin): desconto, cobrança avulsa e notas internas.
-export function ContaFinanceiro({ contaId }: { contaId: string }) {
+// Bloco financeiro do detalhe da conta (Super Admin): plano do catálogo, trial, desconto, cobrança avulsa e notas.
+export function ContaFinanceiro({ contaId, onChanged }: { contaId: string; onChanged?: () => void }) {
   const [desc, setDesc] = useState({ tipo: 'percentual', valor: '', ate: '', motivo: '' });
   const [avulsa, setAvulsa] = useState({ valor: '', observacao: '' });
   const [pix, setPix] = useState<string | null>(null);
   const [notas, setNotas] = useState<Nota[]>([]);
   const [novaNota, setNovaNota] = useState('');
+  const [catalogo, setCatalogo] = useState<PlanoCat[]>([]);
+  const [planoSel, setPlanoSel] = useState('');
+  const [trialDias, setTrialDias] = useState('');
 
   const carregarNotas = useCallback(async () => {
     try { setNotas(await api<Nota[]>(`/admin/contas/${contaId}/notas`)); } catch { /* ignore */ }
   }, [contaId]);
 
-  useEffect(() => { if (contaId) carregarNotas(); }, [contaId, carregarNotas]);
+  useEffect(() => {
+    if (!contaId) return;
+    carregarNotas();
+    api<PlanoCat[]>('/admin/planos-catalogo').then((ps) => setCatalogo(ps.filter((p) => p.ativo))).catch(() => {});
+  }, [contaId, carregarNotas]);
+
+  async function aplicarPlano() {
+    if (!planoSel) { toast.error('Selecione um plano.'); return; }
+    try {
+      await api(`/admin/contas/${contaId}/aplicar-plano`, { method: 'POST', body: JSON.stringify({ planoCatalogoId: planoSel }) });
+      toast.success('Plano aplicado à assinatura.');
+      onChanged?.();
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao aplicar plano'); }
+  }
+  async function aplicarTrial(dias: number) {
+    try {
+      await api(`/admin/contas/${contaId}/trial`, { method: 'POST', body: JSON.stringify({ dias }) });
+      toast.success(dias > 0 ? `Trial de ${dias} dias aplicado.` : 'Trial removido.');
+      setTrialDias('');
+      onChanged?.();
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro'); }
+  }
 
   async function salvarDesconto(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +91,30 @@ export function ContaFinanceiro({ contaId }: { contaId: string }) {
 
   return (
     <>
+      {/* Plano do catálogo + Trial */}
+      <div className="ui-card p-5 space-y-4">
+        <div>
+          <h2 className="font-semibold">Plano do catálogo</h2>
+          <p className="text-xs text-slate-400 mb-2">Aplica os valores de um plano padrão à assinatura desta conta.</p>
+          <div className="flex flex-wrap gap-2">
+            <select value={planoSel} onChange={(e) => setPlanoSel(e.target.value)} className="flex-1 min-w-[180px] border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm">
+              <option value="">Selecione um plano…</option>
+              {catalogo.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tipoConta}) · R$ {Number(p.valorBase).toFixed(2)}</option>)}
+            </select>
+            <button type="button" onClick={aplicarPlano} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Aplicar plano</button>
+          </div>
+        </div>
+        <div className="border-t border-slate-100 dark:border-slate-700 pt-3">
+          <h2 className="font-semibold">Trial (cortesia)</h2>
+          <p className="text-xs text-slate-400 mb-2">Durante o trial a conta não é cobrada nem suspensa.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="number" min={1} value={trialDias} onChange={(e) => setTrialDias(e.target.value)} placeholder="dias" className="w-28 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm" />
+            <button type="button" onClick={() => aplicarTrial(Number(trialDias))} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Aplicar trial</button>
+            <button type="button" onClick={() => aplicarTrial(0)} className="text-sm text-rose-500">Remover trial</button>
+          </div>
+        </div>
+      </div>
+
       {/* Desconto */}
       <form onSubmit={salvarDesconto} className="ui-card p-5 space-y-3">
         <h2 className="font-semibold">Desconto recorrente</h2>

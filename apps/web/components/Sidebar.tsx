@@ -39,6 +39,7 @@ const ADMIN: Item[] = [
   { href: '/admin/agentes', label: 'Agentes IA', icon: Bot },
   { href: '/admin/financeiro', label: 'Financeiro', icon: BarChart3 },
   { href: '/admin/faturamento', label: 'Faturamento', icon: CreditCard },
+  { href: '/admin/planos-catalogo', label: 'Catálogo de planos', icon: Puzzle },
   { href: '/admin/menu', label: 'Atalhos do menu', icon: Settings },
 ];
 

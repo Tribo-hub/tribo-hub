@@ -666,12 +666,33 @@ model AssinaturaPlataforma {
   descontoValor  Decimal?  @db.Decimal(12, 2)
   descontoAte    DateTime? // vigência do desconto (null = sem prazo)
   descontoMotivo String?
+  // Fase 3: vínculo opcional com o catálogo + trial manual
+  planoCatalogoId String?
+  trialAte        DateTime? // enquanto > agora: não cobra nem suspende
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   conta Conta @relation(fields: [contaId], references: [id])
 
   @@map("assinaturas_plataforma")
+}
+
+// Catálogo de planos (Fase 3) — padroniza preços; a assinatura copia os valores ao aplicar.
+model PlanoCatalogo {
+  id                String      @id @default(uuid())
+  slug              String      @unique
+  nome              String
+  tipoConta         TipoConta
+  valorBase         Decimal     @db.Decimal(12, 2)
+  alunosIncluidos   Int? // infoprodutor
+  valorPorExcedente Decimal?    @db.Decimal(12, 2) // infoprodutor
+  limiteUsuarios    Int? // corporativo
+  recursos          Json? // flags/observações do plano
+  ativo             Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("planos_catalogo")
 }
 
 // Notas internas por conta (suporte/financeiro) — Fase 2.
