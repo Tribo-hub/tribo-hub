@@ -203,10 +203,12 @@ export class GamificacaoService {
     });
   }
 
-  // Config de uma trilha (se ainda não houver override, devolve a config efetiva como ponto de partida).
-  async obterConfigTrilha(user: AuthUser, trilhaId: string): Promise<Config> {
+  // Config de uma trilha. `personalizada` indica se tem regra própria (true) ou herda da conta (false).
+  async obterConfigTrilha(user: AuthUser, trilhaId: string): Promise<Config & { personalizada: boolean }> {
     await this.trilhaDaConta(user.contaId!, trilhaId);
-    return this.getConfig(user.contaId!, trilhaId);
+    const override = await this.prisma.configGamificacaoTrilha.findUnique({ where: { trilhaId } });
+    const config = await this.getConfig(user.contaId!, trilhaId);
+    return { ...config, personalizada: !!override };
   }
 
   async salvarConfigTrilha(user: AuthUser, trilhaId: string, dto: Partial<Config>) {
@@ -217,6 +219,13 @@ export class GamificacaoService {
       create: { trilhaId, contaId: user.contaId!, ...dados },
       update: dados,
     });
+  }
+
+  // Remove a regra própria da trilha — ela volta a herdar o padrão da conta.
+  async resetConfigTrilha(user: AuthUser, trilhaId: string) {
+    await this.trilhaDaConta(user.contaId!, trilhaId);
+    await this.prisma.configGamificacaoTrilha.deleteMany({ where: { trilhaId } });
+    return { ok: true };
   }
 
   // ---------- Helpers ----------

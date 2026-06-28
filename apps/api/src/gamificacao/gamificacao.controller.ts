@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put, UseGuards } from '@nestjs/common';
 import { Role } from '@tribohub/db';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -48,5 +48,10 @@ export class GamificacaoPainelController {
   @Put('trilha/:trilhaId')
   salvarTrilha(@CurrentUser() u: AuthUser, @Param('trilhaId') trilhaId: string, @Body() dto: ConfigGamificacaoDto) {
     return this.gam.salvarConfigTrilha(u, trilhaId, dto);
+  }
+
+  @Delete('trilha/:trilhaId')
+  resetTrilha(@CurrentUser() u: AuthUser, @Param('trilhaId') trilhaId: string) {
+    return this.gam.resetConfigTrilha(u, trilhaId);
   }
 }

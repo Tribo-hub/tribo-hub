@@ -43,24 +43,43 @@ const PRESETS: Record<PresetKey, { nome: string; valores: Partial<Config> }> = {
   comunidade: { nome: 'Foco em comunidade', valores: { xpAula: 10, xpTrilha: 80, xpPlanoItem: 10, xpQuiz: 15, xpAvaliacao: 10, xpComentario: 15, xpPorNivel: 200 } },
 };
 
+// Mantém só os 13 campos da config (descarta contaId/updatedAt/personalizada que vêm no GET),
+// evitando que o PUT envie campos não permitidos (forbidNonWhitelisted) e falhe ao salvar.
+function soConfig(o: Partial<Config>): Config {
+  const r = { ...PADRAO };
+  (Object.keys(PADRAO) as (keyof Config)[]).forEach((k) => {
+    if (o[k] != null) r[k] = Number(o[k]);
+  });
+  return r;
+}
+
 export default function GamificacaoConfigPage() {
   const router = useRouter();
   const [cfg, setCfg] = useState<Config>(PADRAO);
   const [salvando, setSalvando] = useState(false);
   const [trilhas, setTrilhas] = useState<{ id: string; titulo: string }[]>([]);
   const [escopo, setEscopo] = useState<string>('conta'); // 'conta' | trilhaId
+  const [personalizada, setPersonalizada] = useState(true);
+  const [carregandoCfg, setCarregandoCfg] = useState(true);
+  const [snapshot, setSnapshot] = useState('');
 
   const urlEscopo = (esc: string) => (esc === 'conta' ? '/painel/gamificacao' : `/painel/gamificacao/trilha/${esc}`);
 
   const carregarConfig = useCallback(async (esc: string) => {
+    setCarregandoCfg(true);
     try {
-      const c = await api<Config>(urlEscopo(esc));
-      setCfg({ ...PADRAO, ...c });
+      const c = await api<Partial<Config> & { personalizada?: boolean }>(urlEscopo(esc));
+      const limpo = soConfig(c);
+      setCfg(limpo);
+      setSnapshot(JSON.stringify(limpo));
+      setPersonalizada(esc === 'conta' ? true : !!c.personalizada);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         clearToken();
         router.replace('/login');
       }
+    } finally {
+      setCarregandoCfg(false);
     }
   }, [router]);
 
@@ -72,6 +91,14 @@ export default function GamificacaoConfigPage() {
   useEffect(() => {
     if (getToken()) carregarConfig(escopo);
   }, [escopo, carregarConfig]);
+
+  const sujo = JSON.stringify(cfg) !== snapshot;
+
+  function trocarEscopo(novo: string) {
+    if (novo === escopo) return;
+    if (sujo && !confirm('Há alterações não salvas que serão perdidas. Trocar mesmo assim?')) return;
+    setEscopo(novo);
+  }
 
   function set(campo: keyof Config, v: number) {
     setCfg((c) => ({ ...c, [campo]: Math.max(0, v || 0) }));
@@ -85,6 +112,8 @@ export default function GamificacaoConfigPage() {
     setSalvando(true);
     try {
       await api(urlEscopo(escopo), { method: 'PUT', body: JSON.stringify(cfg) });
+      setSnapshot(JSON.stringify(cfg));
+      if (escopo !== 'conta') setPersonalizada(true);
       toast.success(escopo === 'conta' ? 'Configuração padrão salva.' : 'Configuração da trilha salva.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
@@ -93,7 +122,20 @@ export default function GamificacaoConfigPage() {
     }
   }
 
+  async function resetarParaPadrao() {
+    if (escopo === 'conta') return;
+    if (!confirm('Remover a configuração própria desta trilha? Ela voltará a usar o padrão da conta.')) return;
+    try {
+      await api(urlEscopo(escopo), { method: 'DELETE' });
+      toast.success('Trilha voltou a usar o padrão da conta.');
+      await carregarConfig(escopo);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao redefinir');
+    }
+  }
+
   const num = 'w-24 ui-input text-right';
+  const nomeEscopo = trilhas.find((t) => t.id === escopo)?.titulo ?? 'trilha';
 
   return (
     <Shell area="painel">
@@ -106,15 +148,35 @@ export default function GamificacaoConfigPage() {
         {/* Escopo */}
         <div className="ui-card p-5">
           <label className="text-sm font-medium">Configurar gamificação de:</label>
-          <select value={escopo} onChange={(e) => setEscopo(e.target.value)} className="w-full ui-input mt-2">
-            <option value="conta">Padrão da conta (todas as trilhas)</option>
-            {trilhas.map((t) => <option key={t.id} value={t.id}>Trilha: {t.titulo}</option>)}
+          <select value={escopo} onChange={(e) => trocarEscopo(e.target.value)} className="w-full ui-input mt-2 font-medium">
+            <option value="conta">⭐ Padrão da conta (todas as trilhas)</option>
+            {trilhas.map((t) => <option key={t.id} value={t.id}>📚 Trilha: {t.titulo}</option>)}
           </select>
-          <p className="text-xs text-slate-400 mt-2">
-            {escopo === 'conta'
-              ? 'Regra padrão, aplicada às trilhas que não têm configuração própria.'
-              : 'Esta trilha usará estes valores (sobrepõe o padrão da conta).'}
-          </p>
+
+          {/* Banner do escopo atual — deixa evidente qual config está na tela */}
+          <div className={`mt-3 rounded-lg px-4 py-3 text-sm flex items-start gap-2 ${
+            escopo === 'conta'
+              ? 'bg-tribo-50 dark:bg-tribo-900/20 text-tribo-800 dark:text-tribo-200'
+              : personalizada
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200'
+                : 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200'
+          }`}>
+            <span>{carregandoCfg ? '⏳' : escopo === 'conta' ? '⭐' : personalizada ? '✓' : '↪'}</span>
+            <div className="flex-1">
+              {carregandoCfg ? (
+                <span>Carregando configuração…</span>
+              ) : escopo === 'conta' ? (
+                <span>Editando o <b>padrão da conta</b> — vale para todas as trilhas sem regra própria.</span>
+              ) : personalizada ? (
+                <span>Editando a <b>configuração própria</b> da trilha <b>{nomeEscopo}</b>.</span>
+              ) : (
+                <span>A trilha <b>{nomeEscopo}</b> está <b>herdando o padrão da conta</b>. Ajuste e salve para criar uma regra só dela.</span>
+              )}
+            </div>
+            {escopo !== 'conta' && personalizada && !carregandoCfg && (
+              <button onClick={resetarParaPadrao} className="text-xs underline whitespace-nowrap shrink-0">usar padrão da conta</button>
+            )}
+          </div>
         </div>
 
         {/* Presets */}
@@ -181,10 +243,11 @@ export default function GamificacaoConfigPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button onClick={salvar} disabled={salvando} className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white text-sm font-semibold px-6 py-2.5 rounded-lg">
-            {salvando ? 'Salvando...' : 'Salvar configuração'}
+        <div className="flex items-center gap-3 sticky bottom-0 bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur py-3 -mx-1 px-1">
+          <button onClick={salvar} disabled={salvando || carregandoCfg} className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white text-sm font-semibold px-6 py-2.5 rounded-lg">
+            {salvando ? 'Salvando...' : escopo === 'conta' ? 'Salvar padrão da conta' : `Salvar configuração da trilha`}
           </button>
+          {sujo && !carregandoCfg && <span className="text-xs text-amber-600 font-medium">● alterações não salvas</span>}
         </div>
       </div>
     </Shell>
