@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuariosService } from './usuarios.service';
@@ -30,6 +30,16 @@ class AvatarUploadDto {
   nomeArquivo!: string;
 }
 
+class AlterarSenhaDto {
+  @IsString()
+  senhaAtual!: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(100)
+  novaSenha!: string;
+}
+
 @Controller('me')
 @UseGuards(JwtAuthGuard)
 export class UsuariosController {
@@ -49,5 +59,11 @@ export class UsuariosController {
   @Post('avatar-upload-url')
   avatarUploadUrl(@CurrentUser() user: AuthUser, @Body() dto: AvatarUploadDto) {
     return this.usuarios.urlAvatarUpload(user, dto.nomeArquivo);
+  }
+
+  // Troca de senha do próprio usuário (qualquer papel).
+  @Patch('senha')
+  alterarSenha(@CurrentUser() user: AuthUser, @Body() dto: AlterarSenhaDto) {
+    return this.usuarios.alterarSenha(user.sub, dto.senhaAtual, dto.novaSenha);
   }
 }

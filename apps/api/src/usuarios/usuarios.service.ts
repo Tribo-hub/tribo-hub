@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -80,6 +81,20 @@ export class UsuariosService {
       },
       select: { id: true, nome: true, email: true, telefone: true, role: true, avatarUrl: true },
     });
+  }
+
+  // Troca de senha do próprio usuário: confere a senha atual e grava a nova.
+  async alterarSenha(userId: string, senhaAtual: string, novaSenha: string) {
+    const user = await this.prisma.usuario.findUnique({ where: { id: userId }, select: { senhaHash: true } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    const ok = await bcrypt.compare(senhaAtual, user.senhaHash);
+    if (!ok) throw new UnauthorizedException('Senha atual incorreta.');
+    if (await bcrypt.compare(novaSenha, user.senhaHash)) {
+      throw new BadRequestException('A nova senha deve ser diferente da atual.');
+    }
+    const senhaHash = await bcrypt.hash(novaSenha, 12);
+    await this.prisma.usuario.update({ where: { id: userId }, data: { senhaHash } });
+    return { ok: true };
   }
 
   // URL assinada para o próprio usuário subir o avatar (qualquer papel, inclusive aluno).

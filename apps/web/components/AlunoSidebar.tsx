@@ -5,10 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Home, CalendarDays, ListChecks, Trophy, Bot, Award,
-  Sun, Moon, LogOut, ChevronLeft, ChevronRight, type LucideIcon,
+  Sun, Moon, LogOut, ChevronLeft, ChevronRight, KeyRound, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
 import { SinoNotificacoes } from './SinoNotificacoes';
+import { AlterarSenhaModal } from './AlterarSenhaModal';
 
 type Item = { href: string; label: string; icon: LucideIcon; exact?: boolean };
 
@@ -31,6 +32,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
+  const [senhaAberta, setSenhaAberta] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
   ];
 
   return (
+    <>
     <aside
       className={`bg-slate-950 text-slate-300 h-screen flex flex-col shrink-0 z-50 w-64
         fixed top-0 left-0 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -154,6 +157,15 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
           {!collapsed && <span>{dark ? 'Modo claro' : 'Modo escuro'}</span>}
         </button>
         <button
+          onClick={() => setSenhaAberta(true)}
+          title="Alterar senha"
+          aria-label="Alterar senha"
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 ${collapsed ? 'justify-center' : ''}`}
+        >
+          <KeyRound size={18} className="shrink-0" />
+          {!collapsed && <span>Alterar senha</span>}
+        </button>
+        <button
           onClick={sair}
           title="Sair"
           aria-label="Sair"
@@ -164,5 +176,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
         </button>
       </div>
     </aside>
+    <AlterarSenhaModal open={senhaAberta} onClose={() => setSenhaAberta(false)} />
+    </>
   );
 }
