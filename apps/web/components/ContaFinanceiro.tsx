@@ -1,0 +1,135 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../lib/api';
+import { toast } from '../lib/toast';
+import { CopyButton } from './CopyButton';
+
+interface Nota { id: string; texto: string; createdAt: string }
+
+// Bloco financeiro do detalhe da conta (Super Admin): desconto, cobrança avulsa e notas internas.
+export function ContaFinanceiro({ contaId }: { contaId: string }) {
+  const [desc, setDesc] = useState({ tipo: 'percentual', valor: '', ate: '', motivo: '' });
+  const [avulsa, setAvulsa] = useState({ valor: '', observacao: '' });
+  const [pix, setPix] = useState<string | null>(null);
+  const [notas, setNotas] = useState<Nota[]>([]);
+  const [novaNota, setNovaNota] = useState('');
+
+  const carregarNotas = useCallback(async () => {
+    try { setNotas(await api<Nota[]>(`/admin/contas/${contaId}/notas`)); } catch { /* ignore */ }
+  }, [contaId]);
+
+  useEffect(() => { if (contaId) carregarNotas(); }, [contaId, carregarNotas]);
+
+  async function salvarDesconto(e: React.FormEvent) {
+    e.preventDefault();
+    if (!desc.valor) { toast.error('Informe o valor do desconto.'); return; }
+    try {
+      await api(`/admin/contas/${contaId}/desconto`, {
+        method: 'POST',
+        body: JSON.stringify({ tipo: desc.tipo, valor: Number(desc.valor), ate: desc.ate || null, motivo: desc.motivo || undefined }),
+      });
+      toast.success('Desconto aplicado (vale a partir da próxima fatura).');
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao aplicar desconto'); }
+  }
+  async function removerDesconto() {
+    if (!confirm('Remover o desconto desta conta?')) return;
+    try { await api(`/admin/contas/${contaId}/desconto`, { method: 'DELETE' }); toast.success('Desconto removido.'); setDesc({ tipo: 'percentual', valor: '', ate: '', motivo: '' }); }
+    catch (err) { toast.error(err instanceof Error ? err.message : 'Erro'); }
+  }
+
+  async function gerarAvulsa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!avulsa.valor) { toast.error('Informe o valor.'); return; }
+    try {
+      const r = await api<{ pix: { pixCopiaECola?: string } | null }>(`/admin/contas/${contaId}/cobranca-avulsa`, {
+        method: 'POST',
+        body: JSON.stringify({ valor: Number(avulsa.valor), observacao: avulsa.observacao || undefined }),
+      });
+      setPix(r.pix?.pixCopiaECola ?? null);
+      toast.success('Cobrança avulsa criada.');
+      setAvulsa({ valor: '', observacao: '' });
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao gerar cobrança'); }
+  }
+
+  async function adicionarNota(e: React.FormEvent) {
+    e.preventDefault();
+    if (!novaNota.trim()) return;
+    try { await api(`/admin/contas/${contaId}/notas`, { method: 'POST', body: JSON.stringify({ texto: novaNota }) }); setNovaNota(''); await carregarNotas(); }
+    catch (err) { toast.error(err instanceof Error ? err.message : 'Erro'); }
+  }
+  async function removerNota(id: string) {
+    try { await api(`/admin/notas/${id}`, { method: 'DELETE' }); await carregarNotas(); } catch { /* ignore */ }
+  }
+
+  const inp = 'w-full mt-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm';
+
+  return (
+    <>
+      {/* Desconto */}
+      <form onSubmit={salvarDesconto} className="ui-card p-5 space-y-3">
+        <h2 className="font-semibold">Desconto recorrente</h2>
+        <div className="grid sm:grid-cols-4 gap-3 text-sm">
+          <label className="block">Tipo
+            <select value={desc.tipo} onChange={(e) => setDesc({ ...desc, tipo: e.target.value })} className={inp}>
+              <option value="percentual">Percentual (%)</option>
+              <option value="fixo">Fixo (R$)</option>
+            </select>
+          </label>
+          <label className="block">Valor
+            <input type="number" step="0.01" value={desc.valor} onChange={(e) => setDesc({ ...desc, valor: e.target.value })} className={inp} />
+          </label>
+          <label className="block">Até (opcional)
+            <input type="date" value={desc.ate} onChange={(e) => setDesc({ ...desc, ate: e.target.value })} className={inp} />
+          </label>
+          <label className="block">Motivo (opcional)
+            <input value={desc.motivo} onChange={(e) => setDesc({ ...desc, motivo: e.target.value })} className={inp} />
+          </label>
+        </div>
+        <div className="flex gap-3">
+          <button className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Aplicar desconto</button>
+          <button type="button" onClick={removerDesconto} className="text-sm text-rose-500">Remover desconto</button>
+        </div>
+        <p className="text-xs text-slate-400">O desconto é aplicado no fechamento das próximas faturas (faturas já pagas não mudam).</p>
+      </form>
+
+      {/* Cobrança avulsa */}
+      <form onSubmit={gerarAvulsa} className="ui-card p-5 space-y-3">
+        <h2 className="font-semibold">Cobrança avulsa</h2>
+        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+          <label className="block">Valor (R$)
+            <input type="number" step="0.01" value={avulsa.valor} onChange={(e) => setAvulsa({ ...avulsa, valor: e.target.value })} className={inp} />
+          </label>
+          <label className="block">Observação (opcional)
+            <input value={avulsa.observacao} onChange={(e) => setAvulsa({ ...avulsa, observacao: e.target.value })} className={inp} />
+          </label>
+        </div>
+        <button className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Gerar cobrança Pix</button>
+        {pix && (
+          <div className="text-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg p-3">
+            <p className="text-xs text-slate-500 mb-1">Pix copia-e-cola:</p>
+            <code className="block bg-white dark:bg-slate-800 border rounded p-2 break-all text-xs">{pix}</code>
+            <div className="mt-2"><CopyButton texto={pix} label="Copiar Pix" /></div>
+          </div>
+        )}
+      </form>
+
+      {/* Notas internas */}
+      <div className="ui-card p-5 space-y-3">
+        <h2 className="font-semibold">Notas internas <span className="text-xs font-normal text-slate-400">(só o Super Admin vê)</span></h2>
+        <form onSubmit={adicionarNota} className="flex gap-2">
+          <input value={novaNota} onChange={(e) => setNovaNota(e.target.value)} placeholder="Adicionar nota..." className="flex-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm" />
+          <button className="bg-slate-700 dark:bg-slate-600 text-white text-sm px-4 rounded-lg">Adicionar</button>
+        </form>
+        <ul className="space-y-2">
+          {notas.length === 0 ? <li className="text-sm text-slate-400">Nenhuma nota.</li> : notas.map((n) => (
+            <li key={n.id} className="text-sm flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-700 pb-2">
+              <span><span className="text-slate-700 dark:text-slate-200">{n.texto}</span><br /><span className="text-[11px] text-slate-400">{new Date(n.createdAt).toLocaleString('pt-BR')}</span></span>
+              <button onClick={() => removerNota(n.id)} className="text-rose-500 text-xs shrink-0">remover</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
+  );
+}

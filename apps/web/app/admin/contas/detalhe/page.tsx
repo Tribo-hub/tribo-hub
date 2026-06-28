@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
 import { Shell } from '../../../../components/Shell';
+import { Switch } from '../../../../components/Switch';
+import { ContaFinanceiro } from '../../../../components/ContaFinanceiro';
+import { toast } from '../../../../lib/toast';
 
 interface Assinatura {
   plano: string;
@@ -22,6 +25,8 @@ interface Conta {
   slug: string;
   ativo: boolean;
   permiteAutoCadastro: boolean;
+  permiteComentarios: boolean;
+  sessaoUnica: boolean;
   assinatura: Assinatura | null;
   _count?: { usuarios: number };
 }
@@ -105,17 +110,37 @@ export default function ContaDetalhe() {
 
   async function alternarStatus() {
     if (!conta) return;
-    await api(`/admin/contas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ ativo: !conta.ativo }) });
-    await carregar();
+    const aviso = conta.ativo
+      ? `Suspender a conta "${conta.nome}"? Os usuários dela perdem o acesso até a reativação.`
+      : `Reativar a conta "${conta.nome}"?`;
+    if (!confirm(aviso)) return;
+    try {
+      await api(`/admin/contas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ ativo: !conta.ativo }) });
+      toast.success(conta.ativo ? 'Conta suspensa.' : 'Conta reativada.');
+      await carregar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar status');
+    }
   }
 
-  async function alternarAutoCadastro() {
-    if (!conta) return;
-    await api(`/admin/contas/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ permiteAutoCadastro: !conta.permiteAutoCadastro }),
-    });
-    await carregar();
+  async function salvarFlag(body: Record<string, boolean>, ok: string) {
+    try {
+      await api(`/admin/contas/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      toast.success(ok);
+      await carregar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
+    }
+  }
+
+  function alternarAutoCadastro() {
+    if (conta) salvarFlag({ permiteAutoCadastro: !conta.permiteAutoCadastro }, 'Configuração salva.');
+  }
+  function alternarComentarios() {
+    if (conta) salvarFlag({ permiteComentarios: !conta.permiteComentarios }, 'Configuração salva.');
+  }
+  function alternarSessaoUnica() {
+    if (conta) salvarFlag({ sessaoUnica: !conta.sessaoUnica }, 'Configuração salva.');
   }
 
   if (!conta) {
@@ -131,7 +156,7 @@ export default function ContaDetalhe() {
         {msg && <p className="text-sm text-tribo-600 dark:text-tribo-400">{msg}</p>}
 
         {/* Cabeçalho da conta */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 flex items-center justify-between">
+        <div className="ui-card p-5 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">{conta.nome}</h1>
             <p className="text-xs text-slate-500">{conta.slug}.tribohub.com.br · {conta.tipoConta} · {conta._count?.usuarios ?? 0} usuário(s)</p>
@@ -146,25 +171,38 @@ export default function ContaDetalhe() {
 
         {/* Auto-cadastro (somente infoprodutor) */}
         {ehInfo && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 flex items-center justify-between">
+          <div className="ui-card p-5 flex items-center justify-between">
             <div>
               <p className="font-semibold">Auto-cadastro de alunos</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Permite que alunos criem conta sozinhos em <code>/cadastro</code> (área de membros).
               </p>
             </div>
-            <button
-              onClick={alternarAutoCadastro}
-              className={`text-sm font-semibold px-4 py-2 rounded-lg ${
-                conta.permiteAutoCadastro
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                  : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-              }`}
-            >
-              {conta.permiteAutoCadastro ? 'Ativado' : 'Desativado'}
-            </button>
+            <Switch checked={conta.permiteAutoCadastro} onChange={alternarAutoCadastro} label="Auto-cadastro de alunos" />
           </div>
         )}
+
+        {/* Comentários por aula (qualquer tipo de conta) */}
+        <div className="ui-card p-5 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Comentários nas aulas</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Permite que alunos comentem nas aulas e o produtor responda (engajamento).
+            </p>
+          </div>
+          <Switch checked={conta.permiteComentarios} onChange={alternarComentarios} label="Comentários nas aulas" />
+        </div>
+
+        {/* Anti-compartilhamento (qualquer tipo de conta) */}
+        <div className="ui-card p-5 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Sessão única (anti-compartilhamento)</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Permite apenas um dispositivo logado por aluno. Um novo login encerra o anterior.
+            </p>
+          </div>
+          <Switch checked={conta.sessaoUnica} onChange={alternarSessaoUnica} label="Sessão única" />
+        </div>
 
         {/* Métricas */}
         {metricas && (
@@ -189,7 +227,7 @@ export default function ContaDetalhe() {
                   },
                 ]
             ).map((m) => (
-              <div key={m.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div key={m.label} className="ui-card p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-400">{m.label}</p>
                 <p className="text-2xl font-bold mt-1">{m.value}</p>
               </div>
@@ -198,7 +236,7 @@ export default function ContaDetalhe() {
         )}
 
         {/* Plano / assinatura */}
-        <form onSubmit={salvarAssinatura} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 space-y-3">
+        <form onSubmit={salvarAssinatura} className="ui-card p-5 space-y-3">
           <h2 className="font-semibold">Plano & cobrança</h2>
           <div className="grid sm:grid-cols-2 gap-3 text-sm">
             <label className="block">Plano
@@ -230,8 +268,11 @@ export default function ContaDetalhe() {
           <button className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar plano</button>
         </form>
 
+        {/* Financeiro: desconto, cobrança avulsa e notas */}
+        <ContaFinanceiro contaId={id} />
+
         {/* Usuários */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="ui-card">
           <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700 font-semibold">Usuários</div>
           <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
             {usuarios.length === 0 ? (

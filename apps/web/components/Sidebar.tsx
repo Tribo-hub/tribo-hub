@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Clapperboard, Cable, Ticket, Calendar, ListChecks, Bot, Palette,
   Puzzle, Users, Shield, CreditCard, Settings, ExternalLink, Sun, Moon, LogOut,
-  ChevronLeft, ChevronRight, KeyRound, type LucideIcon,
+  ChevronLeft, ChevronRight, KeyRound, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
 import { AlterarSenhaModal } from './AlterarSenhaModal';
@@ -37,6 +37,7 @@ const ADMIN: Item[] = [
   { href: '/admin/contas', label: 'Contas', icon: Shield },
   { href: '/admin/conteudo', label: 'Catálogo', icon: Clapperboard },
   { href: '/admin/agentes', label: 'Agentes IA', icon: Bot },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: BarChart3 },
   { href: '/admin/faturamento', label: 'Faturamento', icon: CreditCard },
   { href: '/admin/menu', label: 'Atalhos do menu', icon: Settings },
 ];

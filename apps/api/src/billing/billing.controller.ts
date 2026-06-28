@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Headers,
@@ -63,6 +64,59 @@ export class BillingController {
   @Roles(Role.super_admin)
   marcarPaga(@Param('id') id: string) {
     return this.billing.marcarPaga(id);
+  }
+
+  // Super Admin: dashboard financeiro (MRR/ARR/churn/ticket/inadimplência/MRR 6m)
+  @Get('admin/financeiro/dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  dashboard(@Query('competencia') competencia?: string) {
+    return this.billing.dashboard(competencia || competenciaAtual());
+  }
+
+  // Super Admin: desconto recorrente por conta
+  @Post('admin/contas/:id/desconto')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  definirDesconto(@Param('id') id: string, @Body() body: { tipo: 'percentual' | 'fixo'; valor: number; ate?: string | null; motivo?: string }) {
+    return this.billing.definirDesconto(id, body);
+  }
+
+  @Delete('admin/contas/:id/desconto')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  removerDesconto(@Param('id') id: string) {
+    return this.billing.removerDesconto(id);
+  }
+
+  // Super Admin: cobrança avulsa (fora do ciclo) com Pix
+  @Post('admin/contas/:id/cobranca-avulsa')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  cobrancaAvulsa(@Param('id') id: string, @Body() body: { valor: number; observacao?: string }) {
+    return this.billing.cobrancaAvulsa(id, Number(body.valor), body.observacao);
+  }
+
+  // Super Admin: notas internas por conta
+  @Get('admin/contas/:id/notas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  listarNotas(@Param('id') id: string) {
+    return this.billing.listarNotas(id);
+  }
+
+  @Post('admin/contas/:id/notas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  adicionarNota(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body('texto') texto: string) {
+    return this.billing.adicionarNota(id, u.sub, texto);
+  }
+
+  @Delete('admin/notas/:notaId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  removerNota(@Param('notaId') notaId: string) {
+    return this.billing.removerNota(notaId);
   }
 
   // Produtor/Gestor: prévia da própria fatura do mês (acessível mesmo com painel bloqueado, p/ regularizar)

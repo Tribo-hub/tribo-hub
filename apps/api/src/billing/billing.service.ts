@@ -99,36 +99,40 @@ export class BillingService {
     const ass = conta.assinatura;
     const valorBase = Number(ass.valorBase);
 
+    let tipo: 'infoprodutor' | 'corporativo';
+    let alunosAtivos: number | null = null;
+    let assentosUsados: number | null = null;
+    let valorExcedente = 0;
+
     if (conta.tipoConta === TipoConta.infoprodutor) {
+      tipo = 'infoprodutor';
       const ativosRaw = await this.prisma.matricula.findMany({
         where: { contaId, status: 'ativa', OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }] },
         select: { usuarioId: true },
       });
-      const alunosAtivos = new Set(ativosRaw.map((m) => m.usuarioId)).size;
+      alunosAtivos = new Set(ativosRaw.map((m) => m.usuarioId)).size;
       const incluidos = ass.alunosIncluidos ?? 0;
       const excedentes = Math.max(0, alunosAtivos - incluidos);
-      const valorExcedente = excedentes * Number(ass.valorPorExcedente ?? 0);
-      return {
-        tipo: 'infoprodutor' as const,
-        alunosAtivos,
-        assentosUsados: null,
-        valorBase,
-        valorExcedente,
-        valorTotal: valorBase + valorExcedente,
-      };
+      valorExcedente = excedentes * Number(ass.valorPorExcedente ?? 0);
+    } else {
+      tipo = 'corporativo';
+      assentosUsados = await this.prisma.usuario.count({ where: { contaId, role: 'aluno', ativo: true } });
     }
 
-    const assentosUsados = await this.prisma.usuario.count({
-      where: { contaId, role: 'aluno', ativo: true },
-    });
-    return {
-      tipo: 'corporativo' as const,
-      alunosAtivos: null,
-      assentosUsados,
-      valorBase,
-      valorExcedente: 0,
-      valorTotal: valorBase,
-    };
+    const bruto = valorBase + valorExcedente;
+    const descontoValor = this.descontoVigente(ass, bruto);
+    const valorTotal = Math.max(0, bruto - descontoValor);
+    return { tipo, alunosAtivos, assentosUsados, valorBase, valorExcedente, descontoValor, valorTotal };
+  }
+
+  // Desconto vigente da assinatura (percentual/fixo, respeitando a vigência).
+  private descontoVigente(ass: { descontoTipo: string | null; descontoValor: unknown; descontoAte: Date | null }, bruto: number): number {
+    if (!ass.descontoValor) return 0;
+    if (ass.descontoAte && ass.descontoAte.getTime() < Date.now()) return 0;
+    const v = Number(ass.descontoValor);
+    if (v <= 0) return 0;
+    const desc = ass.descontoTipo === 'percentual' ? (bruto * v) / 100 : v;
+    return Math.min(bruto, Math.round(desc * 100) / 100);
   }
 
   // Calcula e grava a fatura (idempotente por conta+competência).
@@ -147,6 +151,7 @@ export class BillingService {
         assentosUsados: c.assentosUsados,
         valorBase: c.valorBase,
         valorExcedente: c.valorExcedente,
+        descontoValor: c.descontoValor,
         valorTotal: c.valorTotal,
         fechadaEm: new Date(),
       },
@@ -155,6 +160,7 @@ export class BillingService {
         assentosUsados: c.assentosUsados,
         valorBase: c.valorBase,
         valorExcedente: c.valorExcedente,
+        descontoValor: c.descontoValor,
         valorTotal: c.valorTotal,
         fechadaEm: new Date(),
       },
@@ -182,6 +188,102 @@ export class BillingService {
     });
     const mrr = faturas.reduce((s, f) => s + Number(f.valorTotal), 0);
     return { competencia, mrr, totalContas: faturas.length, faturas };
+  }
+
+  // ===== Dashboard financeiro (Super Admin) =====
+  async dashboard(competencia: string) {
+    const somaPagas = async (comp: string) => {
+      const fs = await this.prisma.faturaPlataforma.findMany({ where: { competencia: comp, status: StatusFatura.paga }, select: { valorTotal: true } });
+      return fs.reduce((s, f) => s + Number(f.valorTotal), 0);
+    };
+    const mrr = await somaPagas(competencia);
+
+    const [ativas, inadimplentes, canceladas, faturasVencidas] = await Promise.all([
+      this.prisma.assinaturaPlataforma.count({ where: { status: StatusAssinatura.ativa } }),
+      this.prisma.assinaturaPlataforma.count({ where: { status: { in: [StatusAssinatura.inadimplente, StatusAssinatura.suspensa] } } }),
+      this.prisma.assinaturaPlataforma.count({ where: { status: StatusAssinatura.cancelada } }),
+      this.prisma.faturaPlataforma.count({ where: { competencia, status: StatusFatura.vencida } }),
+    ]);
+
+    const ticketMedio = ativas > 0 ? mrr / ativas : 0;
+    const churn = ativas + canceladas > 0 ? (canceladas / (ativas + canceladas)) * 100 : 0;
+
+    // MRR dos últimos 6 meses (inclui a competência atual)
+    const [ay, am] = competencia.split('-').map(Number);
+    const historico: { competencia: string; mrr: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(ay, am - 1 - i, 1));
+      const comp = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      historico.push({ competencia: comp, mrr: await somaPagas(comp) });
+    }
+
+    return {
+      competencia,
+      mrr,
+      arr: mrr * 12,
+      ticketMedio,
+      churn,
+      contasAtivas: ativas,
+      inadimplentes,
+      canceladas,
+      faturasVencidas,
+      historicoMrr: historico,
+    };
+  }
+
+  // ===== Cobrança avulsa (fora do ciclo) =====
+  async cobrancaAvulsa(contaId: string, valor: number, observacao?: string) {
+    if (!valor || valor <= 0) throw new NotFoundException('Valor inválido');
+    const venc = new Date(Date.now() + env.BILLING_DIAS_VENCIMENTO * DIA_MS);
+    const fatura = await this.prisma.faturaPlataforma.create({
+      data: {
+        contaId,
+        competencia: `${competenciaAtual()}#avulsa-${Date.now()}`,
+        valorBase: valor,
+        valorExcedente: 0,
+        valorTotal: valor,
+        avulsa: true,
+        observacao: observacao ?? null,
+        vencimentoEm: venc,
+        metodoPagamento: 'pix',
+        fechadaEm: new Date(),
+      },
+    });
+    let pix: Awaited<ReturnType<BillingService['cobrar']>> | null = null;
+    try { pix = await this.cobrar(fatura.id); } catch { /* Efí indisponível */ }
+    return { faturaId: fatura.id, valor, pix };
+  }
+
+  // ===== Desconto por conta =====
+  async definirDesconto(contaId: string, dto: { tipo: 'percentual' | 'fixo'; valor: number; ate?: string | null; motivo?: string }) {
+    return this.prisma.assinaturaPlataforma.update({
+      where: { contaId },
+      data: {
+        descontoTipo: dto.tipo,
+        descontoValor: dto.valor,
+        descontoAte: dto.ate ? new Date(dto.ate) : null,
+        descontoMotivo: dto.motivo ?? null,
+      },
+    });
+  }
+
+  async removerDesconto(contaId: string) {
+    return this.prisma.assinaturaPlataforma.update({
+      where: { contaId },
+      data: { descontoTipo: null, descontoValor: null, descontoAte: null, descontoMotivo: null },
+    });
+  }
+
+  // ===== Notas internas por conta =====
+  async listarNotas(contaId: string) {
+    return this.prisma.notaConta.findMany({ where: { contaId }, orderBy: { createdAt: 'desc' } });
+  }
+  async adicionarNota(contaId: string, autorId: string, texto: string) {
+    return this.prisma.notaConta.create({ data: { contaId, autorId, texto } });
+  }
+  async removerNota(id: string) {
+    await this.prisma.notaConta.deleteMany({ where: { id } });
+    return { ok: true };
   }
 
   // Fatura em aberto (pendente/vencida) da conta — usada na tela de "regularize" do produtor.
