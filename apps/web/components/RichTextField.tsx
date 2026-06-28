@@ -74,6 +74,7 @@ function EditorModal({
   onSave: (html: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const [len, setLen] = useState(0);
 
   useEffect(() => {
@@ -91,10 +92,25 @@ function EditorModal({
 
   const excedeu = maxLength != null && len > maxLength;
 
-  // Executa um comando mantendo a seleção (mousedown preventDefault evita perder o foco).
+  // Guarda a seleção atual do editor (alguns controles — cor, selects — tiram o foco do contentEditable).
+  function salvarSelecao() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && ref.current?.contains(sel.anchorNode)) {
+      savedRange.current = sel.getRangeAt(0).cloneRange();
+    }
+  }
+
+  // Executa um comando restaurando a seleção salva (faz cor/fonte/tamanho/alinhamento funcionarem).
   function exec(cmd: string, arg?: string) {
     ref.current?.focus();
+    const sel = window.getSelection();
+    if (savedRange.current && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange.current);
+    }
     document.execCommand(cmd, false, arg);
+    salvarSelecao();
+    setLen(ref.current?.textContent?.trim().length ?? 0);
   }
 
   const btn =
@@ -194,7 +210,9 @@ function EditorModal({
             ref={ref}
             contentEditable
             suppressContentEditableWarning
-            onInput={() => setLen(ref.current?.textContent?.trim().length ?? 0)}
+            onInput={() => { setLen(ref.current?.textContent?.trim().length ?? 0); salvarSelecao(); }}
+            onKeyUp={salvarSelecao}
+            onMouseUp={salvarSelecao}
             className="prose-conteudo min-h-[300px] outline-none text-sm text-slate-800 dark:text-slate-100"
           />
         </div>

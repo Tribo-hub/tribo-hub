@@ -13,7 +13,7 @@ import { TrilhaConfig } from '../../../../components/TrilhaConfig';
 import { AulaEditor } from '../../../../components/AulaEditor';
 import { sanitizeHtml } from '../../../../lib/sanitize';
 import { toast } from '../../../../lib/toast';
-import { Pencil, Brain, MessageSquare, ChevronUp, ChevronDown, Trash2, GripVertical } from 'lucide-react';
+import { Pencil, Brain, MessageSquare, ChevronUp, ChevronDown, ChevronRight, Trash2, GripVertical } from 'lucide-react';
 
 interface Aula {
   id: string;
@@ -59,6 +59,15 @@ export default function TrilhaDetalhePage() {
   const [comentAberto, setComentAberto] = useState<string | null>(null);
   const [editAberto, setEditAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<{ tipo: 'modulos' | 'aulas'; id: string } | null>(null);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set()); // módulos expandidos (padrão: lista fechada)
+
+  function toggleModulo(mid: string) {
+    setAbertos((s) => {
+      const n = new Set(s);
+      if (n.has(mid)) n.delete(mid); else n.add(mid);
+      return n;
+    });
+  }
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -95,17 +104,33 @@ export default function TrilhaDetalhePage() {
     }
   }
 
+  // Aplica uma nova ordem (lista de ids) reatribuindo ordem = 1..n.
+  function aplicarOrdem<T extends { id: string; ordem: number }>(lista: T[], ids: string[]): T[] {
+    const map = new Map(lista.map((x) => [x.id, x]));
+    return ids.map((id, i) => ({ ...(map.get(id) as T), ordem: i + 1 }));
+  }
+
+  // Subir/descer: troca otimista na tela + persiste em paralelo (sem recarregar tudo).
   async function mover(tipo: 'modulos' | 'aulas', a: { id: string; ordem: number }, b: { id: string; ordem: number }) {
+    setTrilha((t) => {
+      if (!t) return t;
+      const swap = <T extends { id: string; ordem: number }>(arr: T[]): T[] =>
+        arr.map((x) => (x.id === a.id ? { ...x, ordem: b.ordem } : x.id === b.id ? { ...x, ordem: a.ordem } : x)).sort((x, y) => x.ordem - y.ordem);
+      if (tipo === 'modulos') return { ...t, modulos: swap(t.modulos) };
+      return { ...t, modulos: t.modulos.map((m) => ({ ...m, aulas: swap(m.aulas) })) };
+    });
     try {
-      await api(`/painel/${tipo}/${a.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: b.ordem }) });
-      await api(`/painel/${tipo}/${b.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: a.ordem }) });
-      await carregar();
+      await Promise.all([
+        api(`/painel/${tipo}/${a.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: b.ordem }) }),
+        api(`/painel/${tipo}/${b.id}`, { method: 'PATCH', body: JSON.stringify({ ordem: a.ordem }) }),
+      ]);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro');
+      toast.error(err instanceof Error ? err.message : 'Erro ao mover');
+      carregar();
     }
   }
 
-  // Reordenar por arrastar: move fromId para a posição de toId e persiste a ordem da lista.
+  // Reordenar por arrastar: aplica otimista na tela + persiste em paralelo.
   async function reordenar(tipo: 'modulos' | 'aulas', lista: { id: string }[], fromId: string, toId: string) {
     if (fromId === toId) return;
     const ids = lista.map((x) => x.id);
@@ -113,13 +138,16 @@ export default function TrilhaDetalhePage() {
     const to = ids.indexOf(toId);
     if (from < 0 || to < 0) return;
     ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setTrilha((t) => {
+      if (!t) return t;
+      if (tipo === 'modulos') return { ...t, modulos: aplicarOrdem(t.modulos, ids) };
+      return { ...t, modulos: t.modulos.map((m) => (m.aulas.some((a) => a.id === fromId) ? { ...m, aulas: aplicarOrdem(m.aulas, ids) } : m)) };
+    });
     try {
-      for (let i = 0; i < ids.length; i++) {
-        await api(`/painel/${tipo}/${ids[i]}`, { method: 'PATCH', body: JSON.stringify({ ordem: i + 1 }) });
-      }
-      await carregar();
+      await Promise.all(ids.map((id, i) => api(`/painel/${tipo}/${id}`, { method: 'PATCH', body: JSON.stringify({ ordem: i + 1 }) })));
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro');
+      toast.error(err instanceof Error ? err.message : 'Erro ao reordenar');
+      carregar();
     }
   }
 
@@ -161,18 +189,36 @@ export default function TrilhaDetalhePage() {
 
         <TrilhaConfig trilha={trilha} onSaved={carregar} />
 
+        {trilha.modulos.length > 0 && (
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-slate-400">{trilha.modulos.length} módulo(s)</p>
+            <button
+              onClick={() => setAbertos((s) => (s.size >= trilha.modulos.length ? new Set() : new Set(trilha.modulos.map((mm) => mm.id))))}
+              className="text-xs font-medium text-tribo-600 dark:text-tribo-400 hover:underline"
+            >
+              {abertos.size >= trilha.modulos.length ? 'Recolher tudo' : 'Expandir tudo'}
+            </button>
+          </div>
+        )}
+
         <div className="space-y-4">
-          {trilha.modulos.map((m, mi) => (
+          {trilha.modulos.map((m, mi) => {
+            const aberto = abertos.has(m.id);
+            return (
             <div
               key={m.id}
               onDragOver={(e) => { if (arrastando?.tipo === 'modulos') e.preventDefault(); }}
               onDrop={() => { if (arrastando?.tipo === 'modulos') reordenar('modulos', trilha.modulos, arrastando.id, m.id); setArrastando(null); }}
               className={`ui-card ${arrastando?.tipo === 'modulos' ? 'ring-1 ring-tribo-300' : ''}`}
             >
-              <div className="px-5 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
-                <span className="font-semibold flex items-center gap-2">
-                  <span draggable onDragStart={() => setArrastando({ tipo: 'modulos', id: m.id })} onDragEnd={() => setArrastando(null)} title="Arrastar para reordenar" className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"><GripVertical size={16} /></span>
-                  {m.ordem}. {m.titulo}
+              <div className={`px-5 py-3 flex items-center justify-between ${aberto ? 'border-b border-slate-100 dark:border-slate-700' : ''}`}>
+                <span className="font-semibold flex items-center gap-2 min-w-0">
+                  <span draggable onDragStart={() => setArrastando({ tipo: 'modulos', id: m.id })} onDragEnd={() => setArrastando(null)} title="Arrastar para reordenar" className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 shrink-0"><GripVertical size={16} /></span>
+                  <button type="button" onClick={() => toggleModulo(m.id)} className="flex items-center gap-2 min-w-0 hover:text-tribo-600" title={aberto ? 'Recolher' : 'Expandir'}>
+                    {aberto ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
+                    <span className="truncate">{m.ordem}. {m.titulo}</span>
+                  </button>
+                  <span className="text-xs font-normal text-slate-400 shrink-0">{m.aulas.length} aula(s)</span>
                 </span>
                 <div className="flex items-center gap-0.5 text-slate-400">
                   <button disabled={mi === 0} onClick={() => mover('modulos', m, trilha.modulos[mi - 1])} title="Subir" className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-tribo-600"><ChevronUp size={16} /></button>
@@ -180,6 +226,7 @@ export default function TrilhaDetalhePage() {
                   <button onClick={() => { if (confirm(`Remover o módulo "${m.titulo}" e todas as suas aulas? Esta ação não pode ser desfeita.`)) call(`/painel/modulos/${m.id}`, { method: 'DELETE' }); }} title="Remover módulo" className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30"><Trash2 size={16} /></button>
                 </div>
               </div>
+              {aberto && (<>
               <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
                 {m.aulas.map((a, ai) => (
                   <li
@@ -221,8 +268,10 @@ export default function TrilhaDetalhePage() {
                   }, 'Aula salva.')
                 }
               />
+              </>)}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <form
