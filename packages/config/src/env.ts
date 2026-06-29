@@ -46,6 +46,12 @@ const schema = z.object({
   EFI_CERTIFICATE_BASE64: z.string().optional(), // cert .p12 em base64 (produção/Railway)
   EFI_SANDBOX: z.string().optional(),
   EFI_WEBHOOK_HMAC: z.string().optional(), // valida o webhook Pix da Efí (opt-in)
+  // API de Cobranças (boleto/cartão) — aplicação Efí SEPARADA da do Pix (Fase 3c)
+  EFI_COBRANCAS_CLIENT_ID: z.string().optional(),
+  EFI_COBRANCAS_CLIENT_SECRET: z.string().optional(),
+  EFI_PLAN_ID_MENSAL: z.string().optional(), // id do plano de recorrência (cartão)
+  EFI_PLAN_ID_ANUAL: z.string().optional(),
+  EFI_NOTIFICATION_URL: z.string().default('https://api.tribohub.com.br/api/webhooks/efi'), // notificação por cobrança (Cobranças não tem webhook global)
 
   // Ciclo de vida da cobrança (Fase 1) — defaults seguros, configuráveis sem deploy.
   BILLING_DIAS_VENCIMENTO: z.coerce.number().int().positive().default(7),

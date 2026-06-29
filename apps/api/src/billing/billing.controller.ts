@@ -67,6 +67,20 @@ export class BillingController {
     return this.billing.marcarPaga(id);
   }
 
+  // Super Admin: emite um boleto (Efí Cobranças) de uma fatura
+  @Post('admin/faturamento/:id/boleto')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.super_admin)
+  boleto(@Param('id') id: string, @Body() body: { nome: string; email: string; documento: string; telefone?: string; razaoSocial?: string }) {
+    const doc = (body.documento ?? '').replace(/\D/g, '');
+    return this.billing.emitirBoleto(id, {
+      nome: body.nome,
+      email: body.email,
+      telefone: body.telefone,
+      ...(doc.length > 11 ? { cnpj: doc, razaoSocial: body.razaoSocial || body.nome } : { cpf: doc }),
+    });
+  }
+
   // Super Admin: dashboard financeiro (MRR/ARR/churn/ticket/inadimplência/MRR 6m)
   @Get('admin/financeiro/dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -210,7 +224,7 @@ export class BillingController {
   @Post('public/signup-produtor')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  signupProdutor(@Body() body: { marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string; ref?: string }) {
+  signupProdutor(@Body() body: { marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string; ref?: string; metodo?: 'pix' | 'boleto'; documento?: string; telefone?: string }) {
     return this.billing.signupProdutor(body);
   }
 
@@ -245,18 +259,20 @@ export class BillingController {
     return { ok: true };
   }
 
-  // Webhook da Efí: confirma pagamento Pix automaticamente (público; autenticidade por mTLS na Efí).
+  // Webhook da Efí: Pix (body.pix) ou Cobranças/boleto (body.notification = token). Público; autenticidade por mTLS/segredo.
   @Post('webhooks/efi')
   @HttpCode(200)
-  efiWebhookBase(@Body() body: { pix?: Array<{ txid?: string }> }, @Query('hmac') hmac?: string) {
+  efiWebhookBase(@Body() body: { pix?: Array<{ txid?: string }>; notification?: string }, @Query('hmac') hmac?: string) {
     if (!webhookEfiAutorizado(hmac)) return { ok: false };
+    if (body?.notification) return this.billing.processarNotificacaoCobranca(body.notification);
     return this.billing.processarWebhookEfi(body);
   }
 
   @Post('webhooks/efi/pix')
   @HttpCode(200)
-  efiWebhook(@Body() body: { pix?: Array<{ txid?: string }> }, @Query('hmac') hmac?: string) {
+  efiWebhook(@Body() body: { pix?: Array<{ txid?: string }>; notification?: string }, @Query('hmac') hmac?: string) {
     if (!webhookEfiAutorizado(hmac)) return { ok: false };
+    if (body?.notification) return this.billing.processarNotificacaoCobranca(body.notification);
     return this.billing.processarWebhookEfi(body);
   }
 

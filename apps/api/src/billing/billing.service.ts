@@ -248,6 +248,65 @@ export class BillingService {
     };
   }
 
+  // ===== Boleto (API de Cobranças Efí) — Fase 3c =====
+  async emitirBoleto(faturaId: string, customer: { nome: string; email: string; cpf?: string; cnpj?: string; razaoSocial?: string; telefone?: string }) {
+    const fatura = await this.prisma.faturaPlataforma.findUnique({
+      where: { id: faturaId },
+      include: { conta: { select: { nome: true } } },
+    });
+    if (!fatura) throw new NotFoundException('Fatura não encontrada');
+    const venc = fatura.vencimentoEm ?? new Date(Date.now() + env.BILLING_DIAS_VENCIMENTO * DIA_MS);
+    const expireAt = venc.toISOString().slice(0, 10);
+    const b = await this.efi.criarBoleto({
+      valor: Number(fatura.valorTotal),
+      descricao: `Tribo Hub - fatura ${fatura.competencia} - ${fatura.conta.nome}`,
+      customId: fatura.id,
+      expireAt,
+      customer,
+    });
+    await this.prisma.faturaPlataforma.update({
+      where: { id: faturaId },
+      data: {
+        efiChargeId: b.chargeId || null,
+        boletoUrl: b.link ?? b.pdf ?? null,
+        boletoLinhaDigitavel: b.linhaDigitavel ?? null,
+        metodoPagamento: 'boleto',
+        vencimentoEm: fatura.vencimentoEm ?? venc,
+      },
+    });
+    return b;
+  }
+
+  // Processa a notificação da API de Cobranças (token recebido no webhook) e baixa as faturas pagas.
+  async processarNotificacaoCobranca(token: string) {
+    const eventos = await this.efi.consultarNotificacao(token);
+    let processados = 0;
+    for (const e of eventos) {
+      const status = e.status?.current;
+      if (!status || !['paid', 'settled', 'link_paid'].includes(status)) continue;
+      let alvo = e.custom_id
+        ? await this.prisma.faturaPlataforma.findUnique({ where: { id: e.custom_id } }).catch(() => null)
+        : null;
+      if (!alvo && e.identifiers?.charge_id) {
+        alvo = await this.prisma.faturaPlataforma.findFirst({ where: { efiChargeId: String(e.identifiers.charge_id) } });
+      }
+      if (alvo && alvo.status !== StatusFatura.paga) {
+        await this.marcarPagaPorId(alvo.id);
+        processados++;
+      }
+    }
+    return { ok: true, processados };
+  }
+
+  // Baixa uma fatura como paga (idempotente) + reativa a conta + gera comissão.
+  private async marcarPagaPorId(faturaId: string) {
+    const f = await this.prisma.faturaPlataforma.findUnique({ where: { id: faturaId } });
+    if (!f || f.status === StatusFatura.paga) return;
+    await this.prisma.faturaPlataforma.update({ where: { id: faturaId }, data: { status: StatusFatura.paga, pagoEm: new Date() } });
+    await this.reativarPorPagamento(f.contaId);
+    this.gerarComissao(faturaId).catch(() => undefined);
+  }
+
   // ===== Cobrança avulsa (fora do ciclo) =====
   async cobrancaAvulsa(contaId: string, valor: number, observacao?: string) {
     if (!valor || valor <= 0) throw new NotFoundException('Valor inválido');
@@ -436,7 +495,8 @@ export class BillingService {
 
   // ===== Autoatendimento: cadastro do produtor/empresa + 1ª cobrança Pix =====
   async signupProdutor(dto: {
-    marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string; ref?: string;
+    marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string;
+    cupom?: string; ref?: string; metodo?: 'pix' | 'boleto'; documento?: string; telefone?: string;
   }) {
     const nome = (dto.marca || '').trim();
     const adminNome = (dto.adminNome || '').trim();
@@ -482,17 +542,32 @@ export class BillingService {
           alunosIncluidos: plano.alunosIncluidos ?? null,
           valorPorExcedente: plano.valorPorExcedente ?? null,
           limiteUsuarios: plano.limiteUsuarios ?? null,
+          metodoPreferido: dto.metodo ?? 'pix',
         },
       });
       if (cupom) await this.aplicarCupom(tx, c.id, cupom);
       return c;
     });
 
-    // 1ª fatura (competência atual) + cobrança Pix
+    // 1ª fatura (competência atual) + cobrança no método escolhido
     const fatura = await this.fecharFatura(conta.id, competenciaAtual());
+    const metodo = dto.metodo ?? 'pix';
     let pix: Awaited<ReturnType<BillingService['cobrar']>> | null = null;
+    let boleto: Awaited<ReturnType<BillingService['emitirBoleto']>> | null = null;
     if (Number(fatura.valorTotal) > 0) {
-      try { pix = await this.cobrar(fatura.id); } catch { /* Efí indisponível: cobra no ciclo */ }
+      if (metodo === 'boleto') {
+        const doc = (dto.documento ?? '').replace(/\D/g, '');
+        try {
+          boleto = await this.emitirBoleto(fatura.id, {
+            nome: adminNome,
+            email: emailNorm,
+            telefone: dto.telefone,
+            ...(doc.length > 11 ? { cnpj: doc, razaoSocial: nome } : { cpf: doc }),
+          });
+        } catch { /* Efí indisponível: cobra no ciclo */ }
+      } else {
+        try { pix = await this.cobrar(fatura.id); } catch { /* Efí indisponível: cobra no ciclo */ }
+      }
     }
     return {
       contaId: conta.id,
@@ -500,7 +575,9 @@ export class BillingService {
       email: emailNorm,
       faturaId: fatura.id,
       valorTotal: Number(fatura.valorTotal),
+      metodo,
       pix,
+      boleto,
     };
   }
 

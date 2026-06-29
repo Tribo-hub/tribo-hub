@@ -673,6 +673,10 @@ model AssinaturaPlataforma {
   // Fase 3: vínculo opcional com o catálogo + trial manual
   planoCatalogoId String?
   trialAte        DateTime? // enquanto > agora: não cobra nem suspende
+  // Fase 3c: forma de pagamento preferida + assinatura de cartão recorrente (Efí)
+  metodoPreferido   String? // pix | boleto | cartao
+  efiSubscriptionId String? // id da assinatura de cartão na Efí
+  cartaoMascara     String? // bandeira + 4 últimos dígitos (exibição)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -817,6 +821,10 @@ model FaturaPlataforma {
   pagoEm         DateTime?
   txid           String? // id da cobrança Pix na Efí
   pixCopiaECola  String?
+  // Boleto (API de Cobranças Efí) — Fase 3c
+  efiChargeId          String? // charge_id da cobrança/boleto na Efí
+  boletoUrl            String? // link do boleto (PDF/visualização)
+  boletoLinhaDigitavel String? // código de barras / linha digitável
   fechadaEm      DateTime
   createdAt      DateTime     @default(now())
 

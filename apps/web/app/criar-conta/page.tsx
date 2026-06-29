@@ -20,7 +20,9 @@ interface Plano {
 interface SignupResult {
   email: string;
   valorTotal: number;
+  metodo: 'pix' | 'boleto';
   pix: { pixCopiaECola?: string; imagemQrcode?: string } | null;
+  boleto: { link?: string; pdf?: string; linhaDigitavel?: string } | null;
 }
 
 export default function CriarContaPage() {
@@ -33,6 +35,8 @@ export default function CriarContaPage() {
   const [senha, setSenha] = useState('');
   const [cupom, setCupom] = useState('');
   const [cupomOk, setCupomOk] = useState<string | null>(null);
+  const [metodo, setMetodo] = useState<'pix' | 'boleto'>('pix');
+  const [documento, setDocumento] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState<SignupResult | null>(null);
@@ -60,11 +64,12 @@ export default function CriarContaPage() {
     setErro('');
     if (!planoId) { setErro('Escolha um plano.'); return; }
     if (senha.length < 8) { setErro('A senha deve ter ao menos 8 caracteres.'); return; }
+    if (metodo === 'boleto' && documento.replace(/\D/g, '').length < 11) { setErro('Informe um CPF ou CNPJ válido para o boleto.'); return; }
     setCarregando(true);
     try {
       const res = await api<SignupResult>('/public/signup-produtor', {
         method: 'POST',
-        body: JSON.stringify({ marca, adminNome, adminEmail, senha, planoCatalogoId: planoId, cupom: cupom.trim() || undefined, ref: ref || undefined }),
+        body: JSON.stringify({ marca, adminNome, adminEmail, senha, planoCatalogoId: planoId, cupom: cupom.trim() || undefined, ref: ref || undefined, metodo, documento: metodo === 'boleto' ? documento : undefined }),
       });
       setResultado(res);
     } catch (err) {
@@ -91,7 +96,7 @@ export default function CriarContaPage() {
         <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-7 space-y-4 text-center">
           <div className="w-12 h-12 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/40 grid place-items-center text-2xl">🎉</div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Conta criada!</h1>
-          {resultado.valorTotal > 0 ? (
+          {resultado.valorTotal > 0 && resultado.metodo === 'pix' ? (
             <>
               <p className="text-sm text-slate-500 dark:text-slate-400">Pague o Pix abaixo para ativar a sua assinatura (R$ {resultado.valorTotal.toFixed(2)}).</p>
               {resultado.pix?.imagemQrcode && (
@@ -105,6 +110,22 @@ export default function CriarContaPage() {
                 </div>
               ) : (
                 <p className="text-xs text-amber-600">A cobrança Pix será enviada ao seu e-mail em instantes.</p>
+              )}
+            </>
+          ) : resultado.valorTotal > 0 && resultado.metodo === 'boleto' ? (
+            <>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Seu boleto de R$ {resultado.valorTotal.toFixed(2)} foi gerado. Após o pagamento (compensação em até 2 dias úteis) sua assinatura é ativada.</p>
+              {resultado.boleto?.link && (
+                <a href={resultado.boleto.link} target="_blank" rel="noopener noreferrer" className="inline-block bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Abrir boleto</a>
+              )}
+              {resultado.boleto?.linhaDigitavel ? (
+                <div className="text-left text-sm bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                  <p className="text-xs text-slate-500 mb-1">Linha digitável:</p>
+                  <code className="block bg-white dark:bg-slate-800 border rounded p-2 break-all text-xs">{resultado.boleto.linhaDigitavel}</code>
+                  <div className="mt-2"><CopyButton texto={resultado.boleto.linhaDigitavel} label="Copiar código" /></div>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600">O boleto será enviado ao seu e-mail em instantes.</p>
               )}
             </>
           ) : (
@@ -170,6 +191,27 @@ export default function CriarContaPage() {
           <label className="text-xs text-slate-500 dark:text-slate-400">Senha</label>
           <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required className={inp} />
         </div>
+        <div>
+          <label className="text-xs text-slate-500 dark:text-slate-400">Forma de pagamento</label>
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            {(['pix', 'boleto'] as const).map((m) => (
+              <button
+                type="button"
+                key={m}
+                onClick={() => setMetodo(m)}
+                className={`border rounded-lg px-3 py-2 text-sm font-medium capitalize transition ${metodo === m ? 'border-tribo-500 ring-1 ring-tribo-500 bg-tribo-50 dark:bg-tribo-950/20 text-tribo-700 dark:text-tribo-300' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}
+              >
+                {m === 'pix' ? 'Pix' : 'Boleto'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {metodo === 'boleto' && (
+          <div>
+            <label className="text-xs text-slate-500 dark:text-slate-400">CPF ou CNPJ (para o boleto)</label>
+            <input value={documento} onChange={(e) => setDocumento(e.target.value)} className={inp} placeholder="somente números" />
+          </div>
+        )}
         <div>
           <label className="text-xs text-slate-500 dark:text-slate-400">Cupom (opcional)</label>
           <div className="flex gap-2 mt-1">
