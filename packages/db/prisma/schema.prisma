@@ -114,6 +114,8 @@ model Conta {
   planosAtivos        Boolean @default(false) // Onda D: planos de ação (accountability)
   gamificacaoAtiva    Boolean @default(false) // Onda E: XP, níveis e badges
   origemCadastro      String? // super_admin | autoatendimento (Fase 3b)
+  referidoPorParceiroId String? // Fase 4: parceiro/afiliado que indicou esta conta
+  referidoEm            DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -130,6 +132,7 @@ model Conta {
   assinatura    AssinaturaPlataforma?
   faturas       FaturaPlataforma[]
   notas         NotaConta[]
+  referidoPorParceiro Parceiro? @relation("ContaParceiro", fields: [referidoPorParceiroId], references: [id])
 
   @@map("contas")
 }
@@ -713,6 +716,72 @@ model CupomPlataforma {
   updatedAt    DateTime   @updatedAt
 
   @@map("cupons_plataforma")
+}
+
+// ============================================================
+// PARCEIROS / AFILIADOS (Fase 4)
+// ============================================================
+
+enum StatusComissao {
+  pendente // dentro da carência
+  disponivel // carência cumprida, pronta para pagamento
+  paga
+  revertida // estorno/cancelamento
+}
+
+model Parceiro {
+  id                 String   @id @default(uuid())
+  codigo             String   @unique // código de indicação (?ref=PRTxxxx)
+  nome               String
+  email              String?
+  documento          String? // CPF/CNPJ
+  chavePix           String?
+  comissaoPercentual Decimal  @default(20) @db.Decimal(5, 2) // taxa base
+  tiers              Json? // faixas progressivas: [{ minContas, percentual }]
+  ativo              Boolean  @default(true)
+  observacao         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  comissoes       ComissaoParceiro[]
+  contasReferidas Conta[]            @relation("ContaParceiro")
+
+  @@map("parceiros")
+}
+
+// Comissão por fatura paga (idempotente por faturaId).
+model ComissaoParceiro {
+  id          String         @id @default(uuid())
+  parceiroId  String
+  contaId     String
+  faturaId    String         @unique // 1 comissão por fatura paga
+  competencia String
+  baseValor   Decimal        @db.Decimal(12, 2) // valor pago da fatura
+  percentual  Decimal        @db.Decimal(5, 2)
+  valor       Decimal        @db.Decimal(12, 2)
+  status      StatusComissao @default(pendente)
+  disponivelEm DateTime // pagoEm + carência
+  pagaEm      DateTime?
+  createdAt   DateTime       @default(now())
+
+  parceiro Parceiro @relation(fields: [parceiroId], references: [id])
+
+  @@index([parceiroId])
+  @@index([status])
+  @@map("comissoes_parceiro")
+}
+
+// Histórico de troca de parceiro indicador de uma conta.
+model TrocaParceiroConta {
+  id                String   @id @default(uuid())
+  contaId           String
+  parceiroAnteriorId String?
+  parceiroNovoId    String?
+  motivo            String?
+  em                DateTime @default(now())
+
+  @@index([contaId])
+  @@map("trocas_parceiro_conta")
 }
 
 // Notas internas por conta (suporte/financeiro) — Fase 2.

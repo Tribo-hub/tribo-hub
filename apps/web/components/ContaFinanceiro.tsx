@@ -7,6 +7,7 @@ import { CopyButton } from './CopyButton';
 
 interface Nota { id: string; texto: string; createdAt: string }
 interface PlanoCat { id: string; nome: string; tipoConta: string; valorBase: string; ativo: boolean }
+interface ParceiroOpt { id: string; nome: string; codigo: string; ativo: boolean }
 
 // Bloco financeiro do detalhe da conta (Super Admin): plano do catálogo, trial, desconto, cobrança avulsa e notas.
 export function ContaFinanceiro({ contaId, onChanged }: { contaId: string; onChanged?: () => void }) {
@@ -18,6 +19,8 @@ export function ContaFinanceiro({ contaId, onChanged }: { contaId: string; onCha
   const [catalogo, setCatalogo] = useState<PlanoCat[]>([]);
   const [planoSel, setPlanoSel] = useState('');
   const [trialDias, setTrialDias] = useState('');
+  const [parceiros, setParceiros] = useState<ParceiroOpt[]>([]);
+  const [parceiroSel, setParceiroSel] = useState('');
 
   const carregarNotas = useCallback(async () => {
     try { setNotas(await api<Nota[]>(`/admin/contas/${contaId}/notas`)); } catch { /* ignore */ }
@@ -27,7 +30,16 @@ export function ContaFinanceiro({ contaId, onChanged }: { contaId: string; onCha
     if (!contaId) return;
     carregarNotas();
     api<PlanoCat[]>('/admin/planos-catalogo').then((ps) => setCatalogo(ps.filter((p) => p.ativo))).catch(() => {});
+    api<ParceiroOpt[]>('/admin/parceiros').then((ps) => setParceiros(ps.filter((p) => p.ativo))).catch(() => {});
+    api<{ referidoPorParceiroId: string | null } | null>(`/admin/contas/${contaId}/parceiro`).then((r) => setParceiroSel(r?.referidoPorParceiroId ?? '')).catch(() => {});
   }, [contaId, carregarNotas]);
+
+  async function salvarParceiro() {
+    try {
+      await api(`/admin/contas/${contaId}/parceiro`, { method: 'POST', body: JSON.stringify({ parceiroId: parceiroSel || null }) });
+      toast.success('Parceiro indicador atualizado.');
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro'); }
+  }
 
   async function aplicarPlano() {
     if (!planoSel) { toast.error('Selecione um plano.'); return; }
@@ -111,6 +123,17 @@ export function ContaFinanceiro({ contaId, onChanged }: { contaId: string; onCha
             <input type="number" min={1} value={trialDias} onChange={(e) => setTrialDias(e.target.value)} placeholder="dias" className="w-28 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm" />
             <button type="button" onClick={() => aplicarTrial(Number(trialDias))} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Aplicar trial</button>
             <button type="button" onClick={() => aplicarTrial(0)} className="text-sm text-rose-500">Remover trial</button>
+          </div>
+        </div>
+        <div className="border-t border-slate-100 dark:border-slate-700 pt-3">
+          <h2 className="font-semibold">Parceiro indicador</h2>
+          <p className="text-xs text-slate-400 mb-2">Define quem indicou esta conta (gera comissão nas faturas pagas).</p>
+          <div className="flex flex-wrap gap-2">
+            <select value={parceiroSel} onChange={(e) => setParceiroSel(e.target.value)} className="flex-1 min-w-[180px] border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm">
+              <option value="">Sem parceiro</option>
+              {parceiros.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.codigo})</option>)}
+            </select>
+            <button type="button" onClick={salvarParceiro} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar</button>
           </div>
         </div>
       </div>

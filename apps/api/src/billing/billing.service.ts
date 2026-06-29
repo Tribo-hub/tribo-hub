@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, StatusAssinatura, StatusFatura, TipoCobranca, TipoConta, Role } from '@tribohub/db';
+import { Prisma, StatusAssinatura, StatusComissao, StatusFatura, TipoCobranca, TipoConta, Role } from '@tribohub/db';
 import { env } from '@tribohub/config';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../auth/auth.service';
@@ -64,6 +64,7 @@ export class BillingService {
       data: { status: 'paga', pagoEm: new Date() },
     });
     await this.reativarPorPagamento(fatura.contaId);
+    this.gerarComissao(fatura.id).catch(() => undefined); // fire-and-forget
     return { ok: true, faturaId: fatura.id };
   }
 
@@ -86,6 +87,7 @@ export class BillingService {
       data: { status: 'paga', pagoEm: new Date() },
     });
     await this.reativarPorPagamento(fatura.contaId);
+    this.gerarComissao(fatura.id).catch(() => undefined); // fire-and-forget
     return atualizada;
   }
 
@@ -434,7 +436,7 @@ export class BillingService {
 
   // ===== Autoatendimento: cadastro do produtor/empresa + 1ª cobrança Pix =====
   async signupProdutor(dto: {
-    marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string;
+    marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string; ref?: string;
   }) {
     const nome = (dto.marca || '').trim();
     const adminNome = (dto.adminNome || '').trim();
@@ -448,6 +450,11 @@ export class BillingService {
     // valida o cupom antes de criar nada
     const cupom = dto.cupom ? await this.validarCupom(dto.cupom, plano.tipoConta) : null;
 
+    // resolve o parceiro indicador (?ref=); ignora código inválido/inativo
+    const parceiro = dto.ref
+      ? await this.prisma.parceiro.findFirst({ where: { codigo: dto.ref.trim().toUpperCase(), ativo: true }, select: { id: true } })
+      : null;
+
     const slug = await this.slugUnico(nome);
     const senhaHash = await AuthService.hashSenha(dto.senha);
     const ehInfo = plano.tipoConta === TipoConta.infoprodutor;
@@ -457,7 +464,10 @@ export class BillingService {
       if (emailEmUso) throw new ConflictException('E-mail já cadastrado');
 
       const c = await tx.conta.create({
-        data: { nome, tipoConta: plano.tipoConta, slug, subdominio: slug, origemCadastro: 'autoatendimento' },
+        data: {
+          nome, tipoConta: plano.tipoConta, slug, subdominio: slug, origemCadastro: 'autoatendimento',
+          ...(parceiro ? { referidoPorParceiroId: parceiro.id, referidoEm: new Date() } : {}),
+        },
       });
       await tx.usuario.create({
         data: { contaId: c.id, nome: adminNome, email: emailNorm, senhaHash, role: Role.admin_tenant },
@@ -605,6 +615,79 @@ export class BillingService {
       }
     }
     return { processadas };
+  }
+
+  // ===== Motor de comissão (Fase 4) — idempotente por faturaId, fire-and-forget =====
+  async gerarComissao(faturaId: string) {
+    const fatura = await this.prisma.faturaPlataforma.findUnique({
+      where: { id: faturaId },
+      include: { conta: { select: { id: true, referidoPorParceiroId: true } } },
+    });
+    if (!fatura || fatura.status !== StatusFatura.paga) return;
+    const valorPago = Number(fatura.valorTotal);
+    if (valorPago <= 0) return;
+    const parceiroId = fatura.conta.referidoPorParceiroId;
+    if (!parceiroId) return;
+
+    // idempotência: 1 comissão por fatura
+    const existe = await this.prisma.comissaoParceiro.findUnique({ where: { faturaId } });
+    if (existe) return;
+
+    const parceiro = await this.prisma.parceiro.findUnique({ where: { id: parceiroId } });
+    if (!parceiro || !parceiro.ativo) return;
+
+    // anti auto-indicação: parceiro não ganha da própria conta (mesmo e-mail do admin)
+    if (parceiro.email) {
+      const admin = await this.prisma.usuario.findFirst({
+        where: { contaId: fatura.conta.id, role: Role.admin_tenant },
+        select: { email: true },
+      });
+      if (admin?.email && admin.email.toLowerCase() === parceiro.email.toLowerCase()) return;
+    }
+
+    const percentual = await this.taxaVigente(parceiro);
+    const valor = Math.round(valorPago * percentual) / 100;
+    if (valor <= 0) return;
+
+    const base = fatura.pagoEm ?? new Date();
+    const disponivelEm = new Date(base.getTime() + env.COMISSAO_CARENCIA_DIAS * DIA_MS);
+
+    await this.prisma.comissaoParceiro.create({
+      data: {
+        parceiroId,
+        contaId: fatura.conta.id,
+        faturaId,
+        competencia: fatura.competencia,
+        baseValor: valorPago,
+        percentual,
+        valor,
+        disponivelEm,
+      },
+    });
+  }
+
+  // Taxa vigente do parceiro: faixa progressiva pelo nº de contas ativas indicadas (fallback = taxa base).
+  private async taxaVigente(parceiro: { id: string; comissaoPercentual: unknown; tiers: unknown }): Promise<number> {
+    let percentual = Number(parceiro.comissaoPercentual);
+    const tiers = Array.isArray(parceiro.tiers) ? (parceiro.tiers as Array<{ minContas?: number; percentual?: number }>) : [];
+    if (tiers.length) {
+      const contasAtivas = await this.prisma.conta.count({ where: { referidoPorParceiroId: parceiro.id, ativo: true } });
+      for (const t of tiers) {
+        if (typeof t.minContas === 'number' && typeof t.percentual === 'number' && contasAtivas >= t.minContas) {
+          percentual = Math.max(percentual, t.percentual);
+        }
+      }
+    }
+    return percentual;
+  }
+
+  // Promove comissões cuja carência venceu: pendente -> disponivel (cron diário).
+  async promoverComissoes(hoje: Date = new Date()) {
+    const r = await this.prisma.comissaoParceiro.updateMany({
+      where: { status: StatusComissao.pendente, disponivelEm: { lte: hoje } },
+      data: { status: StatusComissao.disponivel },
+    });
+    return { promovidas: r.count };
   }
 
   private async marcarEstado(assinaturaId: string, estado: string, hoje: Date) {

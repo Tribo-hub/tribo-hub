@@ -36,9 +36,12 @@ export default function CriarContaPage() {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState<SignupResult | null>(null);
+  const [ref, setRef] = useState('');
 
   useEffect(() => {
     api<Plano[]>('/public/planos-catalogo').then((ps) => { setPlanos(ps); if (ps[0]) setPlanoId(ps[0].id); }).catch(() => {});
+    const r = new URLSearchParams(window.location.search).get('ref');
+    if (r) setRef(r.trim().toUpperCase());
   }, []);
 
   const plano = planos.find((p) => p.id === planoId) || null;
@@ -61,7 +64,7 @@ export default function CriarContaPage() {
     try {
       const res = await api<SignupResult>('/public/signup-produtor', {
         method: 'POST',
-        body: JSON.stringify({ marca, adminNome, adminEmail, senha, planoCatalogoId: planoId, cupom: cupom.trim() || undefined }),
+        body: JSON.stringify({ marca, adminNome, adminEmail, senha, planoCatalogoId: planoId, cupom: cupom.trim() || undefined, ref: ref || undefined }),
       });
       setResultado(res);
     } catch (err) {
@@ -175,6 +178,8 @@ export default function CriarContaPage() {
           </div>
           {cupomOk && <p className={`text-[11px] mt-1 ${cupomOk.includes('✓') ? 'text-emerald-600' : 'text-rose-500'}`}>{cupomOk}</p>}
         </div>
+
+        {ref && <p className="text-[11px] text-slate-400">Indicado por <span className="font-mono">{ref}</span></p>}
 
         <button type="submit" disabled={carregando} className="w-full bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition">
           {carregando ? 'Criando...' : 'Criar conta e pagar'}

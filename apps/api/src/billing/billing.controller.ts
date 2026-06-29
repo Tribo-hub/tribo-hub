@@ -210,7 +210,7 @@ export class BillingController {
   @Post('public/signup-produtor')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  signupProdutor(@Body() body: { marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string }) {
+  signupProdutor(@Body() body: { marca: string; adminNome: string; adminEmail: string; senha: string; planoCatalogoId: string; cupom?: string; ref?: string }) {
     return this.billing.signupProdutor(body);
   }
 

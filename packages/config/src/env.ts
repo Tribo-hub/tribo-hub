@@ -51,6 +51,9 @@ const schema = z.object({
   BILLING_DIAS_VENCIMENTO: z.coerce.number().int().positive().default(7),
   BILLING_SUSPENSAO_PAINEL_DIAS: z.coerce.number().int().positive().default(15),
   BILLING_SUSPENSAO_ALUNOS_DIAS: z.coerce.number().int().positive().default(30),
+
+  // Parceiros / afiliados (Fase 4)
+  COMISSAO_CARENCIA_DIAS: z.coerce.number().int().nonnegative().default(30),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -40,6 +40,12 @@ async function run() {
       log.log(`Ciclo de vida processado: ${r.processadas} fatura(s) tocada(s).`);
     }
 
+    // Parceiros: promove comissões cuja carência venceu (pendente -> disponível).
+    if (job === 'comissoes' || job === 'daily') {
+      const r = await app.get(BillingService, { strict: false }).promoverComissoes(new Date());
+      log.log(`Comissões promovidas: ${r.promovidas}.`);
+    }
+
     await app.close();
     process.exit(0);
   } catch (e) {
