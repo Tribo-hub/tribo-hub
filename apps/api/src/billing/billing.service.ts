@@ -290,6 +290,16 @@ export class BillingService {
       if (!alvo && e.identifiers?.charge_id) {
         alvo = await this.prisma.faturaPlataforma.findFirst({ where: { efiChargeId: String(e.identifiers.charge_id) } });
       }
+      // Cartão recorrente: a cobrança da assinatura baixa a fatura aberta da conta.
+      if (!alvo && e.identifiers?.subscription_id) {
+        const ass = await this.prisma.assinaturaPlataforma.findFirst({ where: { efiSubscriptionId: String(e.identifiers.subscription_id) } });
+        if (ass) {
+          alvo = await this.prisma.faturaPlataforma.findFirst({
+            where: { contaId: ass.contaId, status: { in: [StatusFatura.pendente, StatusFatura.vencida] } },
+            orderBy: { fechadaEm: 'desc' },
+          });
+        }
+      }
       if (alvo && alvo.status !== StatusFatura.paga) {
         await this.marcarPagaPorId(alvo.id);
         processados++;
@@ -305,6 +315,52 @@ export class BillingService {
     await this.prisma.faturaPlataforma.update({ where: { id: faturaId }, data: { status: StatusFatura.paga, pagoEm: new Date() } });
     await this.reativarPorPagamento(f.contaId);
     this.gerarComissao(faturaId).catch(() => undefined);
+  }
+
+  // ===== Cartão recorrente (corporativo) — Fase 3c =====
+  async minhaAssinatura(contaId: string) {
+    const conta = await this.prisma.conta.findUnique({ where: { id: contaId }, include: { assinatura: true } });
+    if (!conta || !conta.assinatura) throw new NotFoundException('Assinatura não encontrada');
+    const a = conta.assinatura;
+    return {
+      tipoConta: conta.tipoConta,
+      valorBase: Number(a.valorBase),
+      metodoPreferido: a.metodoPreferido,
+      cartaoMascara: a.cartaoMascara,
+      temCartao: !!a.efiSubscriptionId,
+    };
+  }
+
+  async assinarCartaoCorporativo(contaId: string, dados: {
+    paymentToken: string;
+    customer: { nome: string; cpf: string; email: string; nascimento: string; telefone?: string };
+    endereco?: { rua: string; numero: string; bairro: string; cep: string; cidade: string; estado: string; complemento?: string };
+  }) {
+    const conta = await this.prisma.conta.findUnique({ where: { id: contaId }, include: { assinatura: true } });
+    if (!conta || !conta.assinatura) throw new NotFoundException('Assinatura não encontrada');
+    if (conta.tipoConta !== TipoConta.corporativo) {
+      throw new BadRequestException('Cartão recorrente disponível apenas para contas corporativas');
+    }
+    const planId = env.EFI_PLAN_ID_MENSAL;
+    if (!planId) throw new BadRequestException('Plano de recorrência não configurado (EFI_PLAN_ID_MENSAL)');
+    if (!dados.paymentToken) throw new BadRequestException('Token do cartão ausente');
+    const valor = Number(conta.assinatura.valorBase);
+    if (valor <= 0) throw new BadRequestException('Valor da assinatura inválido');
+
+    const sub = await this.efi.criarAssinaturaCartao({
+      planId,
+      paymentToken: dados.paymentToken,
+      valor,
+      customId: `conta-${contaId}`,
+      descricao: `Tribo Hub - ${conta.nome}`,
+      customer: dados.customer,
+      endereco: dados.endereco,
+    });
+    await this.prisma.assinaturaPlataforma.update({
+      where: { contaId },
+      data: { efiSubscriptionId: sub.subscriptionId || null, cartaoMascara: sub.cardMask ?? null, metodoPreferido: 'cartao' },
+    });
+    return { status: sub.status, cartaoMascara: sub.cardMask ?? null };
   }
 
   // ===== Cobrança avulsa (fora do ciclo) =====
@@ -624,7 +680,9 @@ export class BillingService {
       // 1) Fatura recém-fechada: emite a cobrança Pix, define o vencimento e avisa.
       if (!f.vencimentoEm) {
         const venc = new Date(f.fechadaEm.getTime() + VENC * DIA_MS);
-        if (Number(f.valorTotal) > 0 && !f.txid) {
+        // Cartão recorrente cobra pela assinatura da Efí — não emite Pix.
+        const cartaoRecorrente = ass.metodoPreferido === 'cartao' && !!ass.efiSubscriptionId;
+        if (Number(f.valorTotal) > 0 && !f.txid && !cartaoRecorrente) {
           try { await this.cobrar(f.id); } catch { /* Efí indisponível: tenta no próximo ciclo */ }
         }
         await this.prisma.faturaPlataforma.update({

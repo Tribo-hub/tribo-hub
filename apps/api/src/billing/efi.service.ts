@@ -242,8 +242,62 @@ export class EfiService {
     };
   }
 
+  // Cria uma assinatura de cartão (recorrência) a partir de um plano. payment_token vem do SDK no front.
+  async criarAssinaturaCartao(params: {
+    planId: string;
+    paymentToken: string;
+    valor: number;
+    customId: string;
+    descricao: string;
+    customer: { nome: string; cpf: string; email: string; nascimento: string; telefone?: string };
+    endereco?: { rua: string; numero: string; bairro: string; cep: string; cidade: string; estado: string; complemento?: string };
+  }) {
+    if (!this.cobrancasConfigurado()) {
+      throw new InternalServerErrorException('Efí Cobranças não configurada');
+    }
+    const token = await this.authCob();
+    const dig = (s?: string) => (s ?? '').replace(/\D/g, '');
+    const credit_card: Record<string, unknown> = {
+      payment_token: params.paymentToken,
+      customer: {
+        name: params.customer.nome,
+        cpf: dig(params.customer.cpf),
+        email: params.customer.email,
+        birth: params.customer.nascimento,
+        ...(params.customer.telefone ? { phone_number: dig(params.customer.telefone) } : {}),
+      },
+    };
+    if (params.endereco) {
+      credit_card.billing_address = {
+        street: params.endereco.rua,
+        number: params.endereco.numero,
+        neighborhood: params.endereco.bairro,
+        zipcode: dig(params.endereco.cep),
+        city: params.endereco.cidade,
+        state: params.endereco.estado,
+        ...(params.endereco.complemento ? { complement: params.endereco.complemento } : {}),
+      };
+    }
+    const body = {
+      items: [{ name: params.descricao.slice(0, 255), value: Math.round(params.valor * 100), amount: 1 }],
+      payment: { credit_card },
+      metadata: { notification_url: env.EFI_NOTIFICATION_URL, custom_id: params.customId.slice(0, 255) },
+    };
+    const r = await this.reqCob<any>(`/v1/plan/${params.planId}/subscription/one-step`, 'POST', { Authorization: `Bearer ${token}` }, body);
+    if (r.status >= 300 || !r.body?.data) {
+      this.log.error(`Criar assinatura cartão Efí falhou: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+      throw new InternalServerErrorException('Falha ao criar a assinatura de cartão na Efí');
+    }
+    const d = r.body.data;
+    return {
+      subscriptionId: String(d.subscription_id ?? d.id ?? ''),
+      status: (d.status ?? d.subscription?.status) as string,
+      cardMask: (d.payment?.credit_card?.mask ?? d.card_mask ?? d.mask) as string | undefined,
+    };
+  }
+
   // Consulta uma notificação da API de Cobranças (token recebido no webhook) → lista de eventos.
-  async consultarNotificacao(token: string): Promise<Array<{ custom_id?: string; status?: { current?: string }; identifiers?: { charge_id?: number } }>> {
+  async consultarNotificacao(token: string): Promise<Array<{ custom_id?: string; status?: { current?: string }; identifiers?: { charge_id?: number; subscription_id?: number } }>> {
     if (!this.cobrancasConfigurado()) return [];
     const auth = await this.authCob();
     const r = await this.reqCob<any>(`/v1/notification/${token}`, 'GET', { Authorization: `Bearer ${auth}` });

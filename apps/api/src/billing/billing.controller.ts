@@ -237,6 +237,30 @@ export class BillingController {
     return this.billing.calcular(u.contaId!);
   }
 
+  // Assinatura da própria conta (corporativo: pode configurar cartão recorrente)
+  @Get('painel/assinatura')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.admin_tenant)
+  @PermitirInadimplente()
+  minhaAssinatura(@CurrentUser() u: AuthUser) {
+    return this.billing.minhaAssinatura(u.contaId!);
+  }
+
+  @Post('painel/assinatura/cartao')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.admin_tenant)
+  @PermitirInadimplente()
+  assinarCartao(
+    @CurrentUser() u: AuthUser,
+    @Body() body: {
+      paymentToken: string;
+      customer: { nome: string; cpf: string; email: string; nascimento: string; telefone?: string };
+      endereco?: { rua: string; numero: string; bairro: string; cep: string; cidade: string; estado: string; complemento?: string };
+    },
+  ) {
+    return this.billing.assinarCartaoCorporativo(u.contaId!, body);
+  }
+
   // Fatura em aberto (para a tela de regularização quando o painel está bloqueado)
   @Get('painel/minha-fatura-aberta')
   @UseGuards(JwtAuthGuard, RolesGuard)
