@@ -8,6 +8,7 @@ import {
   Sun, Moon, LogOut, ChevronLeft, ChevronRight, KeyRound, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
+import { lerMarca, salvarMarca } from '../lib/marca';
 import { SinoNotificacoes } from './SinoNotificacoes';
 import { AlterarSenhaModal } from './AlterarSenhaModal';
 
@@ -33,14 +34,18 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
   const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState(false);
-  const [me, setMe] = useState<Me | null>(null);
+  // Inicia com a marca em cache (evita o "flash" da marca padrão no login).
+  const [me, setMe] = useState<Me | null>(() => {
+    const c = lerMarca();
+    return c ? ({ nome: '', conta: { nome: c.nome, corPrimaria: c.corPrimaria, logoUrl: c.logoUrl } } as Me) : null;
+  });
 
   useEffect(() => {
     try {
       setCollapsed(localStorage.getItem('tribo_nav') === '1');
       setDark(document.documentElement.classList.contains('dark'));
     } catch { /* ignore */ }
-    api<Me>('/me').then(setMe).catch(() => {});
+    api<Me>('/me').then((m) => { setMe(m); salvarMarca(m.conta); }).catch(() => {});
   }, []);
 
   function toggleNav() {
@@ -60,8 +65,9 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
     router.replace('/login');
   }
 
-  const cor = me?.conta?.corPrimaria || '#7c3aed';
-  const marca = me?.conta?.nome || 'Tribo Hub';
+  const temMarca = !!me?.conta?.nome;
+  const cor = me?.conta?.corPrimaria || (temMarca ? '#7c3aed' : '#334155');
+  const marca = me?.conta?.nome || '';
   const iniciais = (me?.nome || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
   const itens: Item[] = [
@@ -88,10 +94,12 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
               <img src={me.conta.logoUrl} alt={marca} className="w-8 h-8 rounded-lg object-cover shrink-0" />
             ) : (
               <div className="w-8 h-8 rounded-lg grid place-items-center font-bold text-white shrink-0" style={{ backgroundColor: cor }}>
-                {marca[0]?.toUpperCase() ?? 'T'}
+                {temMarca ? (marca[0]?.toUpperCase() ?? 'T') : ''}
               </div>
             )}
-            {!collapsed && <span className="font-semibold text-white whitespace-nowrap truncate">{marca}</span>}
+            {!collapsed && (temMarca
+              ? <span className="font-semibold text-white whitespace-nowrap truncate">{marca}</span>
+              : <span className="h-4 w-24 rounded bg-slate-700 animate-pulse" />)}
           </Link>
           {!collapsed && (
             <button onClick={toggleNav} title="Recolher menu" aria-label="Recolher menu" className="text-slate-400 hover:text-white">

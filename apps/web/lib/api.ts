@@ -13,6 +13,7 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  try { localStorage.removeItem('tribo_marca'); } catch { /* ignore */ }
 }
 
 export async function api<T = unknown>(

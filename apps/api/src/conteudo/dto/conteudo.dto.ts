@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -83,6 +84,14 @@ export class UpdateTrilhaDto {
   @IsString()
   @MaxLength(500)
   whatsappUrl?: string;
+
+  @IsOptional()
+  @IsIn(['matricula', 'fixa'])
+  dripBase?: string;
+
+  @IsOptional()
+  @IsString()
+  dripInicioEm?: string | null; // data ISO (yyyy-mm-dd) quando dripBase = fixa
 }
 
 export class CreateModuloDto {

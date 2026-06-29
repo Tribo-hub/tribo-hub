@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, KeyRound, BarChart3, Handshake, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
+import { lerMarca, salvarMarca } from '../lib/marca';
 import { AlterarSenhaModal } from './AlterarSenhaModal';
 
 type Item = { href: string; label: string; icon: LucideIcon };
@@ -55,7 +56,10 @@ export function Sidebar({ area, mobileOpen = false, onClose }: { area: 'painel' 
   const [dark, setDark] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [itens, setItens] = useState<Item[]>(area === 'admin' ? ADMIN : INFO);
-  const [marca, setMarca] = useState(area === 'admin' ? 'Super Admin' : 'Tribo Hub');
+  // Painel é white-label (marca do tenant); admin é fixo. Seed do cache evita o "flash".
+  const [marca, setMarca] = useState(area === 'admin' ? 'Super Admin' : (lerMarca()?.nome || 'Tribo Hub'));
+  const [cor, setCor] = useState<string | null>(area === 'admin' ? null : (lerMarca()?.corPrimaria ?? null));
+  const [logo, setLogo] = useState<string | null>(area === 'admin' ? null : (lerMarca()?.logoUrl ?? null));
   const [externos, setExternos] = useState<LinkExterno[]>([]);
 
   const grupo = area === 'admin' ? 'Super Admin · /admin' : 'Painel · /painel';
@@ -68,10 +72,13 @@ export function Sidebar({ area, mobileOpen = false, onClose }: { area: 'painel' 
       /* ignore */
     }
     if (area === 'painel') {
-      api<{ conta?: { tipoConta: string; nome: string } }>('/me')
+      api<{ conta?: { tipoConta: string; nome: string; corPrimaria?: string | null; logoUrl?: string | null } }>('/me')
         .then((m) => {
           setItens(m.conta?.tipoConta === 'corporativo' ? CORP : INFO);
           if (m.conta?.nome) setMarca(m.conta.nome);
+          setCor(m.conta?.corPrimaria ?? null);
+          setLogo(m.conta?.logoUrl ?? null);
+          salvarMarca(m.conta);
         })
         .catch(() => {});
     } else {
@@ -116,9 +123,17 @@ export function Sidebar({ area, mobileOpen = false, onClose }: { area: 'painel' 
       <div className="p-3 border-b border-slate-800">
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-tribo-600 grid place-items-center font-bold text-white shrink-0">
-              {marca[0]?.toUpperCase() ?? 'T'}
-            </div>
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logo} alt={marca} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div
+                className={`w-8 h-8 rounded-lg grid place-items-center font-bold text-white shrink-0 ${cor ? '' : 'bg-tribo-600'}`}
+                style={cor ? { backgroundColor: cor } : undefined}
+              >
+                {marca[0]?.toUpperCase() ?? 'T'}
+              </div>
+            )}
             {!collapsed && <span className="font-semibold text-white whitespace-nowrap truncate">{marca}</span>}
           </div>
           {!collapsed && (
@@ -145,8 +160,9 @@ export function Sidebar({ area, mobileOpen = false, onClose }: { area: 'painel' 
               href={i.href}
               title={i.label}
               onClick={onClose}
+              style={on && cor ? { backgroundColor: cor } : undefined}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg focus-visible:ring-2 focus-visible:ring-tribo-500 outline-none ${collapsed ? 'justify-center' : ''} ${
-                on ? 'bg-tribo-600 text-white' : 'hover:bg-slate-800'
+                on ? (cor ? 'text-white' : 'bg-tribo-600 text-white') : 'hover:bg-slate-800'
               }`}
             >
               <Ic size={18} className="shrink-0" />

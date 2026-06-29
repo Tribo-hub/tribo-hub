@@ -15,6 +15,8 @@ interface TrilhaCfg {
   ofertaParaTrilhas: string[] | null;
   checkoutUrl: string | null;
   whatsappUrl: string | null;
+  dripBase?: string | null;
+  dripInicioEm?: string | null;
 }
 interface TrilhaItem { id: string; titulo: string }
 
@@ -28,6 +30,8 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
   const [alvos, setAlvos] = useState<string[]>(trilha.ofertaParaTrilhas ?? []);
   const [checkout, setCheckout] = useState(trilha.checkoutUrl ?? '');
   const [whats, setWhats] = useState(trilha.whatsappUrl ?? '');
+  const [dripBase, setDripBase] = useState(trilha.dripBase === 'fixa' ? 'fixa' : 'matricula');
+  const [dripInicio, setDripInicio] = useState((trilha.dripInicioEm ?? '').slice(0, 10));
   const [trilhas, setTrilhas] = useState<TrilhaItem[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [salvo, setSalvo] = useState(false);
@@ -79,6 +83,8 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
         ofertaParaTrilhas: alvos,
         checkoutUrl: checkout,
         whatsappUrl: whats,
+        dripBase,
+        dripInicioEm: dripBase === 'fixa' ? (dripInicio || null) : null,
       }),
     });
     setSalvo(true);
@@ -127,6 +133,27 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
           </button>
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={aoSelecionarCapa} />
         </div>
+      </div>
+
+      {/* Liberação por tempo (drip) */}
+      <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Liberação por tempo (drip)</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            Para as aulas com "liberar após N dias", a contagem começa a partir de:
+          </p>
+          <select value={dripBase} onChange={(e) => setDripBase(e.target.value)} className={inp}>
+            <option value="matricula">Data da matrícula de cada aluno (turma sempre aberta)</option>
+            <option value="fixa">Data de início fixa do curso (turma com data única)</option>
+          </select>
+        </div>
+        {dripBase === 'fixa' && (
+          <div>
+            <label className="text-xs text-slate-500 dark:text-slate-400">Data de início do curso</label>
+            <input type="date" value={dripInicio} onChange={(e) => setDripInicio(e.target.value)} className={inp} />
+            <p className="text-[11px] text-slate-400 mt-1">Todos os alunos seguem este calendário. Antes desta data, as aulas com drip ficam bloqueadas.</p>
+          </div>
+        )}
       </div>
 
       {/* Vitrine / oferta */}

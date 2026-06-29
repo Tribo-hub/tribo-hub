@@ -1,11 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ProprietarioConteudo, StatusMatricula, TipoConta } from '@tribohub/db';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PlanoItemTipo, ProprietarioConteudo, StatusMatricula, TipoConta } from '@tribohub/db';
 import { env } from '@tribohub/config';
 import { randomUUID } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { GamificacaoService } from '../gamificacao/gamificacao.service';
 import { ProgressoDto } from './dto/progresso.dto';
 
 const PERCENT_CONCLUSAO = 80;
@@ -15,6 +16,7 @@ export class AlunoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly gamificacao: GamificacaoService,
   ) {}
 
   // Filtro de trilhas acessíveis pelo aluno, conforme o tipo da conta.
@@ -60,12 +62,61 @@ export class AlunoService {
           id: t.id,
           titulo: t.titulo,
           descricao: t.descricao,
-          capaUrl: t.capaUrl,
+          capaUrl: await this.assinarSeArquivo(t.capaUrl),
           totalAulas: total,
           aulasConcluidas: concluidas,
           percentual: total ? Math.round((concluidas / total) * 100) : 0,
         };
       }),
+    );
+  }
+
+  // Vitrine: trilhas marcadas como oferta, trancadas, exibidas para alunos de
+  // determinadas trilhas (ou todos). Só faz sentido no modo infoprodutor.
+  async listarVitrine(user: AuthUser) {
+    const conta = await this.prisma.conta.findUnique({ where: { id: user.contaId! } });
+    if (!conta || !conta.ativo || conta.tipoConta !== TipoConta.infoprodutor) return [];
+
+    // trilhas que o aluno já acessa (matrícula ativa) — não devem aparecer como oferta
+    const mats = await this.prisma.matricula.findMany({
+      where: {
+        usuarioId: user.sub,
+        contaId: user.contaId!,
+        status: StatusMatricula.ativa,
+        OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }],
+      },
+      select: { trilhaId: true },
+    });
+    const minhas = new Set(mats.map((m) => m.trilhaId));
+
+    const candidatas = await this.prisma.trilha.findMany({
+      where: {
+        publicado: true,
+        deletedAt: null,
+        proprietarioTipo: ProprietarioConteudo.tenant,
+        contaId: user.contaId!,
+        exibirComoOferta: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const ofertas = candidatas.filter((t) => {
+      if (minhas.has(t.id)) return false; // já tem acesso
+      if (t.ofertaTodosAlunos) return true;
+      const alvos = Array.isArray(t.ofertaParaTrilhas) ? (t.ofertaParaTrilhas as string[]) : [];
+      return alvos.some((id) => minhas.has(id));
+    });
+
+    return Promise.all(
+      ofertas.map(async (t) => ({
+        id: t.id,
+        titulo: t.titulo,
+        descricao: t.descricao,
+        capaUrl: await this.assinarSeArquivo(t.capaUrl),
+        checkoutUrl: t.checkoutUrl,
+        whatsappUrl: t.whatsappUrl,
+        bloqueada: true,
+      })),
     );
   }
 
@@ -88,6 +139,24 @@ export class AlunoService {
       where: { usuarioId: user.sub, aula: { modulo: { trilhaId: id } } },
     });
     const concluidas = new Set(progresso.filter((p) => p.concluido).map((p) => p.aulaId));
+    const avaliacoes = new Map(progresso.map((p) => [p.aulaId, p.avaliacao]));
+
+    // baseline do drip content: configurável por trilha (data fixa de início OU data da matrícula).
+    let inicio: Date | null = null;
+    if (trilha.dripBase === 'fixa' && trilha.dripInicioEm) {
+      inicio = trilha.dripInicioEm;
+    } else {
+      const matricula = await this.prisma.matricula.findFirst({
+        where: { usuarioId: user.sub, trilhaId: id },
+        select: { createdAt: true },
+      });
+      inicio = matricula?.createdAt ?? null;
+      if (!inicio) {
+        const u = await this.prisma.usuario.findUnique({ where: { id: user.sub }, select: { createdAt: true } });
+        inicio = u?.createdAt ?? new Date();
+      }
+    }
+    const diasDeAcesso = (Date.now() - inicio.getTime()) / 86_400_000;
 
     const modulosOut = await Promise.all(
       modulos.map(async (m) => ({
@@ -95,26 +164,54 @@ export class AlunoService {
         titulo: m.titulo,
         ordem: m.ordem,
         aulas: await Promise.all(
-          m.aulas.map(async (a) => ({
-            id: a.id,
-            titulo: a.titulo,
-            tipoVideo: a.tipoVideo,
-            duracaoSegundos: a.duracaoSegundos,
-            ordem: a.ordem,
-            concluida: concluidas.has(a.id),
-            // upload -> URL assinada temporária; youtube/vimeo -> URL direta
-            videoUrl:
-              a.tipoVideo === 'upload'
-                ? (await this.storage.urlDeDownload(a.videoUrl)).url
-                : a.videoUrl,
-            materialUrl: await this.assinarSeArquivo(a.materialUrl),
-            legendaUrl: await this.assinarSeArquivo(a.legendaUrl),
-          })),
+          m.aulas.map(async (a) => {
+            const bloqueadaDrip = (a.liberaAposDias ?? 0) > diasDeAcesso;
+            const videoUrl =
+              bloqueadaDrip || !a.videoUrl
+                ? null
+                : a.tipoVideo === 'upload'
+                  ? (await this.storage.urlDeDownload(a.videoUrl)).url
+                  : a.videoUrl;
+            return {
+              id: a.id,
+              titulo: a.titulo,
+              tipoVideo: a.tipoVideo,
+              duracaoSegundos: a.duracaoSegundos,
+              ordem: a.ordem,
+              concluida: concluidas.has(a.id),
+              avaliacao: avaliacoes.get(a.id) ?? null,
+              liberaAposDias: a.liberaAposDias,
+              bloqueadaDrip,
+              liberaEm: bloqueadaDrip
+                ? new Date(inicio!.getTime() + (a.liberaAposDias ?? 0) * 86_400_000)
+                : null,
+              videoUrl,
+              conteudoTexto: bloqueadaDrip ? null : a.conteudoTexto,
+              materialUrl: bloqueadaDrip ? null : await this.assinarSeArquivo(a.materialUrl),
+              legendaUrl: bloqueadaDrip ? null : await this.assinarSeArquivo(a.legendaUrl),
+              anexos: bloqueadaDrip ? [] : await this.assinarAnexos(a.anexos),
+            };
+          }),
         ),
       })),
     );
 
     return { id: trilha.id, titulo: trilha.titulo, descricao: trilha.descricao, modulos: modulosOut };
+  }
+
+  // Anexos (materiais complementares): [{nome, path}] -> [{nome, url}] com URL assinada.
+  private async assinarAnexos(raw: unknown): Promise<{ nome: string; url: string }[]> {
+    if (!Array.isArray(raw)) return [];
+    const out: { nome: string; url: string }[] = [];
+    for (const it of raw) {
+      if (it && typeof it === 'object' && 'path' in it) {
+        const anexo = it as { nome?: string; path?: string };
+        if (!anexo.path) continue;
+        const url = await this.assinarSeArquivo(anexo.path);
+        if (url) out.push({ nome: anexo.nome ?? 'arquivo', url });
+      }
+    }
+    return out;
   }
 
   // Material/legenda: se for caminho do Storage, devolve URL assinada; se já for URL, mantém.
@@ -172,8 +269,163 @@ export class AlunoService {
       },
     });
 
+    if (concluido) {
+      await this.gamificacao.registrar(user, 'aula', dto.aulaId);
+      // Tarefas de Plano de Ação do tipo "assistir" vinculadas a esta aula concluem junto (pontuam).
+      const mats = await this.prisma.matricula.findMany({
+        where: { usuarioId: user.sub, contaId: user.contaId!, status: StatusMatricula.ativa },
+        select: { trilhaId: true },
+      });
+      const minhas = mats.map((m) => m.trilhaId);
+      const itensAssistir = await this.prisma.planoItem.findMany({
+        where: {
+          aulaId: dto.aulaId,
+          tipo: PlanoItemTipo.assistir,
+          plano: { contaId: user.contaId!, OR: [{ trilhaId: null }, { trilhaId: { in: minhas } }] },
+        },
+        select: { id: true },
+      });
+      for (const it of itensAssistir) await this.gamificacao.registrar(user, 'plano_item', it.id);
+    }
+
     const certificado = await this.verificarConclusaoTrilha(user, aula.modulo.trilhaId);
     return { ok: true, concluido, certificadoEmitido: !!certificado };
+  }
+
+  // Avaliação da aula (estrelas 1-5).
+  async avaliarAula(user: AuthUser, aulaId: string, nota: number) {
+    const aula = await this.prisma.aula.findFirst({
+      where: { id: aulaId, deletedAt: null },
+      include: { modulo: true },
+    });
+    if (!aula) throw new NotFoundException('Aula não encontrada');
+    await this.trilhaAcessivel(user, aula.modulo.trilhaId);
+
+    await this.prisma.progresso.upsert({
+      where: { usuarioId_aulaId: { usuarioId: user.sub, aulaId } },
+      create: { usuarioId: user.sub, aulaId, contaId: user.contaId!, avaliacao: nota },
+      update: { avaliacao: nota },
+    });
+    await this.gamificacao.registrar(user, 'avaliacao', aulaId);
+    return { ok: true, avaliacao: nota };
+  }
+
+  // Quiz da aula (perguntas + respostas do próprio aluno).
+  private async aulaAcessivelAluno(user: AuthUser, aulaId: string) {
+    const aula = await this.prisma.aula.findFirst({
+      where: { id: aulaId, deletedAt: null },
+      include: { modulo: true },
+    });
+    if (!aula) throw new NotFoundException('Aula não encontrada');
+    await this.trilhaAcessivel(user, aula.modulo.trilhaId);
+    return aula;
+  }
+
+  async obterQuiz(user: AuthUser, aulaId: string) {
+    await this.aulaAcessivelAluno(user, aulaId);
+    const perguntas = await this.prisma.quizPergunta.findMany({
+      where: { aulaId },
+      orderBy: { ordem: 'asc' },
+    });
+    const minhas = await this.prisma.quizResposta.findMany({
+      where: { usuarioId: user.sub, perguntaId: { in: perguntas.map((p) => p.id) } },
+    });
+    const map = new Map(minhas.map((r) => [r.perguntaId, r.resposta]));
+    return perguntas.map((p) => ({ id: p.id, pergunta: p.pergunta, minhaResposta: map.get(p.id) ?? null }));
+  }
+
+  async responderQuiz(user: AuthUser, aulaId: string, respostas: { perguntaId: string; resposta: string }[]) {
+    await this.aulaAcessivelAluno(user, aulaId);
+    const validas = new Set(
+      (await this.prisma.quizPergunta.findMany({ where: { aulaId }, select: { id: true } })).map((p) => p.id),
+    );
+    for (const r of respostas) {
+      if (!validas.has(r.perguntaId) || !r.resposta?.trim()) continue;
+      await this.prisma.quizResposta.upsert({
+        where: { perguntaId_usuarioId: { perguntaId: r.perguntaId, usuarioId: user.sub } },
+        create: { perguntaId: r.perguntaId, usuarioId: user.sub, contaId: user.contaId!, resposta: r.resposta },
+        update: { resposta: r.resposta },
+      });
+    }
+    await this.gamificacao.registrar(user, 'quiz', aulaId);
+    return { ok: true };
+  }
+
+  // Comentários por aula (engajamento). Escopados pela conta do aluno; thread de 1 nível.
+  private async contaPermiteComentarios(contaId?: string | null) {
+    if (!contaId) return true;
+    const conta = await this.prisma.conta.findUnique({
+      where: { id: contaId },
+      select: { permiteComentarios: true },
+    });
+    return conta?.permiteComentarios ?? true;
+  }
+
+  private async montarThreadComentarios(
+    comentarios: { id: string; usuarioId: string; texto: string; respostaAId: string | null; createdAt: Date }[],
+    meuId: string,
+  ) {
+    const autores = await this.prisma.usuario.findMany({
+      where: { id: { in: [...new Set(comentarios.map((c) => c.usuarioId))] } },
+      select: { id: true, nome: true, role: true },
+    });
+    const amap = new Map(autores.map((a) => [a.id, a]));
+    const fmt = (c: (typeof comentarios)[number]) => ({
+      id: c.id,
+      texto: c.texto,
+      autor: amap.get(c.usuarioId)?.nome ?? 'Usuário',
+      isProdutor: (amap.get(c.usuarioId)?.role ?? 'aluno') !== 'aluno',
+      meu: c.usuarioId === meuId,
+      data: c.createdAt,
+    });
+    return comentarios
+      .filter((c) => !c.respostaAId)
+      .map((c) => ({ ...fmt(c), respostas: comentarios.filter((r) => r.respostaAId === c.id).map(fmt) }));
+  }
+
+  async listarComentarios(user: AuthUser, aulaId: string) {
+    await this.aulaAcessivelAluno(user, aulaId);
+    const habilitado = await this.contaPermiteComentarios(user.contaId);
+    const comentarios = await this.prisma.comentarioAula.findMany({
+      where: { aulaId, contaId: user.contaId!, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    return { habilitado, comentarios: await this.montarThreadComentarios(comentarios, user.sub) };
+  }
+
+  async comentar(user: AuthUser, aulaId: string, texto: string, respostaAId?: string) {
+    await this.aulaAcessivelAluno(user, aulaId);
+    if (!(await this.contaPermiteComentarios(user.contaId)))
+      throw new ForbiddenException('Comentários desativados nesta conta');
+    if (!texto?.trim()) throw new BadRequestException('Comentário vazio');
+    if (respostaAId) {
+      const pai = await this.prisma.comentarioAula.findFirst({
+        where: { id: respostaAId, aulaId, contaId: user.contaId!, deletedAt: null },
+      });
+      if (!pai) throw new NotFoundException('Comentário não encontrado');
+    }
+    const c = await this.prisma.comentarioAula.create({
+      data: {
+        aulaId,
+        usuarioId: user.sub,
+        contaId: user.contaId!,
+        texto: texto.trim(),
+        respostaAId: respostaAId ?? null,
+      },
+    });
+    // XP de comentário: 1x por aula (refId = aulaId) para evitar farm com vários comentários.
+    await this.gamificacao.registrar(user, 'comentario', aulaId);
+    return { ok: true, id: c.id };
+  }
+
+  async removerComentario(user: AuthUser, comentarioId: string) {
+    const c = await this.prisma.comentarioAula.findFirst({
+      where: { id: comentarioId, contaId: user.contaId!, deletedAt: null },
+    });
+    if (!c) throw new NotFoundException('Comentário não encontrado');
+    if (c.usuarioId !== user.sub) throw new ForbiddenException('Sem permissão');
+    await this.prisma.comentarioAula.update({ where: { id: comentarioId }, data: { deletedAt: new Date() } });
+    return { ok: true };
   }
 
   private async progressoTrilha(usuarioId: string, trilhaId: string) {
@@ -199,7 +451,7 @@ export class AlunoService {
     });
     if (existe) return existe;
 
-    return this.prisma.certificado.create({
+    const cert = await this.prisma.certificado.create({
       data: {
         usuarioId: user.sub,
         trilhaId,
@@ -207,6 +459,21 @@ export class AlunoService {
         codigoVerificacao: randomUUID(),
       },
     });
+    // notificação de conquista (sino)
+    const trilha = await this.prisma.trilha.findUnique({ where: { id: trilhaId }, select: { titulo: true } });
+    await this.prisma.notificacao
+      .create({
+        data: {
+          usuarioId: user.sub,
+          contaId: user.contaId,
+          titulo: 'Certificado disponível 🎉',
+          mensagem: `Você concluiu "${trilha?.titulo ?? 'a trilha'}" e seu certificado está pronto.`,
+          tipo: 'certificado',
+        },
+      })
+      .catch(() => undefined);
+    await this.gamificacao.registrar(user, 'trilha', trilhaId);
+    return cert;
   }
 
   meusProgressos(user: AuthUser) {

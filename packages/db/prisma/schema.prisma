@@ -189,6 +189,9 @@ model Trilha {
   ofertaParaTrilhas Json? // ids das trilhas cujos alunos veem esta como oferta
   checkoutUrl       String? // link de compra/checkout
   whatsappUrl       String? // link/numero de WhatsApp para falar com o produtor
+  // Drip content: base da contagem de "liberar após N dias"
+  dripBase          String? // matricula (default) | fixa
+  dripInicioEm      DateTime? // data de início fixa do curso (quando dripBase = fixa)
   deletedAt        DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
