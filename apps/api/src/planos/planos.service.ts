@@ -32,6 +32,9 @@ export class PlanosService {
         moduloId: dto.moduloId ?? null,
         prazoEm: dto.prazoEm ? new Date(dto.prazoEm) : null,
         releasedAt: dto.releasedAt ? new Date(dto.releasedAt) : null,
+        agendamento: dto.agendamento ?? 'fixo',
+        liberaAposDias: dto.liberaAposDias ?? null,
+        prazoDias: dto.prazoDias ?? null,
         analiseAtiva: dto.analiseAtiva ?? false,
         ordem: (max._max.ordem ?? 0) + 1,
       },
@@ -49,6 +52,9 @@ export class PlanosService {
         ...(dto.capaUrl !== undefined ? { capaUrl: dto.capaUrl || null } : {}),
         ...(dto.prazoEm !== undefined ? { prazoEm: dto.prazoEm ? new Date(dto.prazoEm) : null } : {}),
         ...(dto.releasedAt !== undefined ? { releasedAt: dto.releasedAt ? new Date(dto.releasedAt) : null } : {}),
+        ...(dto.agendamento !== undefined ? { agendamento: dto.agendamento } : {}),
+        ...(dto.liberaAposDias !== undefined ? { liberaAposDias: dto.liberaAposDias } : {}),
+        ...(dto.prazoDias !== undefined ? { prazoDias: dto.prazoDias } : {}),
         ...(dto.analiseAtiva !== undefined ? { analiseAtiva: dto.analiseAtiva } : {}),
       },
     });
@@ -74,6 +80,7 @@ export class PlanosService {
       trilhaId: p.trilhaId,
       moduloId: p.moduloId,
       trilhaTitulo: p.trilhaId ? nome.get(p.trilhaId) ?? null : null,
+      agendamento: p.agendamento ?? 'fixo',
       totalItens: p._count.itens,
       entregas: p._count.entregas,
     }));
@@ -101,9 +108,14 @@ export class PlanosService {
         : progresso.some((p) => p.itemId === it.id && p.usuarioId === usuarioId && p.concluido);
 
     const agora = Date.now();
+    const ancoras = await this.resolverAncoras(plano, alunoIds);
     const acompanhamento = alunos.map((a) => {
+      const anchor = ancoras.get(a.id) ?? null;
       const concluidos = itens.filter((it) => itemConcluido(it, a.id)).length;
-      const atrasados = itens.filter((it) => it.prazoEm && it.prazoEm.getTime() < agora && !itemConcluido(it, a.id)).length;
+      const atrasados = itens.filter((it) => {
+        const pr = this.prazoItem(plano, it, anchor);
+        return pr && pr.getTime() < agora && !itemConcluido(it, a.id);
+      }).length;
       const e = entregaMap.get(a.id);
       return {
         id: a.id,
@@ -130,6 +142,9 @@ export class PlanosService {
       ordem: plano.ordem,
       prazoEm: plano.prazoEm,
       releasedAt: plano.releasedAt,
+      agendamento: plano.agendamento ?? 'fixo',
+      liberaAposDias: plano.liberaAposDias,
+      prazoDias: plano.prazoDias,
       analiseAtiva: plano.analiseAtiva,
       trilhaId: plano.trilhaId,
       moduloId: plano.moduloId,
@@ -139,6 +154,7 @@ export class PlanosService {
         descricao: i.descricao,
         tipo: i.tipo,
         prazoEm: i.prazoEm,
+        prazoDias: i.prazoDias,
         ordem: i.ordem,
         aula: i.aulaId ? aulasMap.get(i.aulaId) ?? null : null,
       })),
@@ -164,10 +180,12 @@ export class PlanosService {
     const assistidos = (await this.aulasConcluidasPorAluno(itens, [usuarioId])).get(usuarioId) ?? new Set<string>();
     const entrega = await this.prisma.planoEntrega.findUnique({ where: { planoId_usuarioId: { planoId, usuarioId } } });
     const agora = Date.now();
+    const anchor = await this.ancoraDoAluno(plano, usuarioId);
+    const dPlano = this.datasPlano(plano, anchor);
 
     return {
       aluno,
-      plano: { id: plano.id, titulo: plano.titulo, analiseAtiva: plano.analiseAtiva, prazoEm: plano.prazoEm },
+      plano: { id: plano.id, titulo: plano.titulo, analiseAtiva: plano.analiseAtiva, prazoEm: dPlano.prazoEm },
       entrega: entrega
         ? {
             status: entrega.status,
@@ -180,17 +198,18 @@ export class PlanosService {
       itens: itens.map((it) => {
         const p = pmap.get(it.id);
         const concluido = it.tipo === PlanoItemTipo.assistir ? !!(it.aulaId && assistidos.has(it.aulaId)) : !!p?.concluido;
+        const prItem = this.prazoItem(plano, it, anchor);
         return {
           id: it.id,
           titulo: it.titulo,
           tipo: it.tipo,
           aula: it.aulaId ? aulasMap.get(it.aulaId) ?? null : null,
-          prazoEm: it.prazoEm,
+          prazoEm: prItem,
           concluido,
           texto: p?.texto ?? null,
           links: this.lerLinks(p?.links),
           concluidoEm: p?.concluidoEm ?? null,
-          atrasado: !concluido && !!it.prazoEm && it.prazoEm.getTime() < agora,
+          atrasado: !concluido && !!prItem && prItem.getTime() < agora,
         };
       }),
     };
@@ -230,6 +249,7 @@ export class PlanosService {
         tipo,
         aulaId: precisaAula ? dto.aulaId ?? null : null,
         prazoEm: dto.prazoEm ? new Date(dto.prazoEm) : null,
+        prazoDias: dto.prazoDias ?? null,
         ordem: (max._max.ordem ?? 0) + 1,
       },
     });
@@ -243,6 +263,7 @@ export class PlanosService {
         ...(dto.titulo !== undefined ? { titulo: dto.titulo } : {}),
         ...(dto.descricao !== undefined ? { descricao: dto.descricao || null } : {}),
         ...(dto.prazoEm !== undefined ? { prazoEm: dto.prazoEm ? new Date(dto.prazoEm) : null } : {}),
+        ...(dto.prazoDias !== undefined ? { prazoDias: dto.prazoDias } : {}),
       },
     });
   }
@@ -292,15 +313,17 @@ export class PlanosService {
       planos.map(async (p) => {
         const concluidos = p.itens.filter((i) => this.concluidoLocal(i, pmap, assistidos)).length;
         const e = entregaMap.get(p.id);
+        const anchor = await this.ancoraDoAluno(p, user.sub);
+        const { releasedAt, prazoEm } = this.datasPlano(p, anchor);
         return {
           id: p.id,
           titulo: p.titulo,
           subtitulo: p.subtitulo,
           ordem: p.ordem,
           capaUrl: await this.assinarSeArquivo(p.capaUrl),
-          prazoEm: p.prazoEm,
-          releasedAt: p.releasedAt,
-          bloqueado: !!p.releasedAt && p.releasedAt.getTime() > agora,
+          prazoEm,
+          releasedAt,
+          bloqueado: !!releasedAt && releasedAt.getTime() > agora,
           totalItens: p.itens.length,
           concluidos,
           percentual: p.itens.length ? Math.round((concluidos / p.itens.length) * 100) : 0,
@@ -333,7 +356,9 @@ export class PlanosService {
     const assistidos = (await this.aulasConcluidasPorAluno(plano.itens, [user.sub])).get(user.sub) ?? new Set<string>();
     const entrega = await this.prisma.planoEntrega.findUnique({ where: { planoId_usuarioId: { planoId, usuarioId: user.sub } } });
     const agora = Date.now();
-    const bloqueado = !!plano.releasedAt && plano.releasedAt.getTime() > agora;
+    const anchor = await this.ancoraDoAluno(plano, user.sub);
+    const dPlano = this.datasPlano(plano, anchor);
+    const bloqueado = !!dPlano.releasedAt && dPlano.releasedAt.getTime() > agora;
 
     const itens = plano.itens.map((i) => {
       const pr = pmap.get(i.id);
@@ -343,7 +368,7 @@ export class PlanosService {
         titulo: i.titulo,
         descricao: i.descricao,
         tipo: i.tipo,
-        prazoEm: i.prazoEm,
+        prazoEm: this.prazoItem(plano, i, anchor),
         concluido,
         texto: pr?.texto ?? '',
         links: this.lerLinks(pr?.links),
@@ -359,8 +384,8 @@ export class PlanosService {
       descricao: plano.descricao,
       ordem: plano.ordem,
       capaUrl: await this.assinarSeArquivo(plano.capaUrl),
-      prazoEm: plano.prazoEm,
-      releasedAt: plano.releasedAt,
+      prazoEm: dPlano.prazoEm,
+      releasedAt: dPlano.releasedAt,
       bloqueado,
       analiseAtiva: plano.analiseAtiva,
       totalItens: itens.length,
@@ -382,7 +407,9 @@ export class PlanosService {
   async responderItem(user: AuthUser, itemId: string, dto: ResponderItemDto) {
     const item = await this.prisma.planoItem.findUnique({ where: { id: itemId }, include: { plano: true } });
     if (!item || item.plano.contaId !== user.contaId) throw new NotFoundException('Item não encontrado');
-    if (item.plano.releasedAt && item.plano.releasedAt.getTime() > Date.now()) throw new ForbiddenException('Plano ainda não liberado');
+    const ancoraResp = await this.ancoraDoAluno(item.plano, user.sub);
+    const liberacaoResp = this.datasPlano(item.plano, ancoraResp).releasedAt;
+    if (liberacaoResp && liberacaoResp.getTime() > Date.now()) throw new ForbiddenException('Plano ainda não liberado');
     if (item.plano.trilhaId) {
       const mat = await this.prisma.matricula.findFirst({
         where: { usuarioId: user.sub, trilhaId: item.plano.trilhaId, status: StatusMatricula.ativa },
@@ -421,7 +448,9 @@ export class PlanosService {
   async entregarPlano(user: AuthUser, planoId: string) {
     const plano = await this.prisma.planoAcao.findFirst({ where: { id: planoId, contaId: user.contaId! }, include: { itens: true } });
     if (!plano) throw new NotFoundException('Plano não encontrado');
-    if (plano.releasedAt && plano.releasedAt.getTime() > Date.now()) throw new ForbiddenException('Plano ainda não liberado');
+    const ancoraEntrega = await this.ancoraDoAluno(plano, user.sub);
+    const dEntrega = this.datasPlano(plano, ancoraEntrega);
+    if (dEntrega.releasedAt && dEntrega.releasedAt.getTime() > Date.now()) throw new ForbiddenException('Plano ainda não liberado');
     if (plano.trilhaId) {
       const minhas = await this.minhasTrilhas(user);
       if (!minhas.includes(plano.trilhaId)) throw new ForbiddenException('Plano não disponível');
@@ -436,7 +465,7 @@ export class PlanosService {
     const todosFeitos = plano.itens.every((i) => this.concluidoLocal(i, pmap, assistidos));
     if (!todosFeitos) throw new BadRequestException('Conclua todas as tarefas antes de entregar o plano.');
 
-    const diasAntesDoPrazo = plano.prazoEm ? Math.floor((plano.prazoEm.getTime() - Date.now()) / DIA) : null;
+    const diasAntesDoPrazo = dEntrega.prazoEm ? Math.floor((dEntrega.prazoEm.getTime() - Date.now()) / DIA) : null;
     const entrega = await this.prisma.planoEntrega.create({
       data: { planoId, usuarioId: user.sub, contaId: user.contaId!, status: PlanoEntregaStatus.submitted, diasAntesDoPrazo },
     });
@@ -518,6 +547,67 @@ export class PlanosService {
       where: { contaId, role: Role.aluno, ativo: true },
       select: { id: true, nome: true, email: true },
     });
+  }
+
+  // ===== Agendamento relativo (D+N) — âncora por aluno (turma/drip/matrícula) =====
+  private async resolverAncoras(plano: { contaId: string; trilhaId: string | null }, usuarioIds: string[]): Promise<Map<string, Date>> {
+    const map = new Map<string, Date>();
+    if (usuarioIds.length === 0) return map;
+    if (plano.trilhaId) {
+      const trilha = await this.prisma.trilha.findUnique({
+        where: { id: plano.trilhaId },
+        select: { usaTurmas: true, dripBase: true, dripInicioEm: true },
+      });
+      if (trilha?.usaTurmas) {
+        const mats = await this.prisma.matricula.findMany({
+          where: { trilhaId: plano.trilhaId, usuarioId: { in: usuarioIds } },
+          select: { usuarioId: true, createdAt: true, turma: { select: { inicioEm: true } } },
+        });
+        for (const m of mats) map.set(m.usuarioId, m.turma?.inicioEm ?? m.createdAt);
+      } else if (trilha?.dripBase === 'fixa' && trilha.dripInicioEm) {
+        for (const id of usuarioIds) map.set(id, trilha.dripInicioEm);
+      } else {
+        const mats = await this.prisma.matricula.findMany({
+          where: { trilhaId: plano.trilhaId, usuarioId: { in: usuarioIds } },
+          select: { usuarioId: true, createdAt: true },
+        });
+        for (const m of mats) map.set(m.usuarioId, m.createdAt);
+      }
+    } else {
+      const mats = await this.prisma.matricula.findMany({
+        where: { contaId: plano.contaId, usuarioId: { in: usuarioIds } },
+        select: { usuarioId: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      for (const m of mats) if (!map.has(m.usuarioId)) map.set(m.usuarioId, m.createdAt);
+    }
+    const faltam = usuarioIds.filter((id) => !map.has(id));
+    if (faltam.length) {
+      const us = await this.prisma.usuario.findMany({ where: { id: { in: faltam } }, select: { id: true, createdAt: true } });
+      for (const u of us) map.set(u.id, u.createdAt);
+    }
+    return map;
+  }
+
+  private async ancoraDoAluno(plano: { contaId: string; trilhaId: string | null }, usuarioId: string): Promise<Date | null> {
+    return (await this.resolverAncoras(plano, [usuarioId])).get(usuarioId) ?? null;
+  }
+
+  // Datas efetivas do plano (modo fixo usa as datas salvas; relativo calcula a partir da âncora).
+  private datasPlano(
+    plano: { agendamento: string | null; releasedAt: Date | null; prazoEm: Date | null; liberaAposDias: number | null; prazoDias: number | null },
+    anchor: Date | null,
+  ): { releasedAt: Date | null; prazoEm: Date | null } {
+    if (plano.agendamento !== 'relativo') return { releasedAt: plano.releasedAt, prazoEm: plano.prazoEm };
+    return {
+      releasedAt: anchor && plano.liberaAposDias != null ? new Date(anchor.getTime() + plano.liberaAposDias * DIA) : null,
+      prazoEm: anchor && plano.prazoDias != null ? new Date(anchor.getTime() + plano.prazoDias * DIA) : null,
+    };
+  }
+
+  private prazoItem(plano: { agendamento: string | null }, item: { prazoEm: Date | null; prazoDias: number | null }, anchor: Date | null): Date | null {
+    if (plano.agendamento !== 'relativo') return item.prazoEm;
+    return anchor && item.prazoDias != null ? new Date(anchor.getTime() + item.prazoDias * DIA) : null;
   }
 
   private async planoDaConta(contaId: string, id: string) {

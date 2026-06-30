@@ -8,10 +8,10 @@ import { toast } from '../../../lib/toast';
 
 type TipoItem = 'check' | 'assistir' | 'resumo' | 'link';
 interface AulaRef { id: string; titulo: string; trilhaId: string }
-interface PlanoResumo { id: string; titulo: string; subtitulo: string | null; ordem: number; trilhaTitulo: string | null; totalItens: number; entregas: number }
-interface Item { id: string; titulo: string; descricao: string | null; tipo: TipoItem; prazoEm: string | null; ordem: number; aula: AulaRef | null }
+interface PlanoResumo { id: string; titulo: string; subtitulo: string | null; ordem: number; trilhaTitulo: string | null; agendamento?: string; totalItens: number; entregas: number }
+interface Item { id: string; titulo: string; descricao: string | null; tipo: TipoItem; prazoEm: string | null; prazoDias: number | null; ordem: number; aula: AulaRef | null }
 interface Aluno { id: string; nome: string; email: string; totalItens: number; concluidos: number; atrasados: number; emDia: boolean; percentual: number; entregue: boolean; entregaStatus: string | null; diasAntesDoPrazo: number | null }
-interface Detalhe { id: string; titulo: string; subtitulo: string | null; descricao: string | null; capaUrl: string | null; ordem: number; prazoEm: string | null; releasedAt: string | null; analiseAtiva: boolean; trilhaId: string | null; moduloId: string | null; itens: Item[]; acompanhamento: Aluno[] }
+interface Detalhe { id: string; titulo: string; subtitulo: string | null; descricao: string | null; capaUrl: string | null; ordem: number; prazoEm: string | null; releasedAt: string | null; agendamento: string; liberaAposDias: number | null; prazoDias: number | null; analiseAtiva: boolean; trilhaId: string | null; moduloId: string | null; itens: Item[]; acompanhamento: Aluno[] }
 interface Trilha { id: string; titulo: string }
 interface AulaOpt { id: string; titulo: string }
 interface Modulo { id: string; titulo: string; aulas: AulaOpt[] }
@@ -27,15 +27,15 @@ export default function PlanosProdutorPage() {
   const [planos, setPlanos] = useState<PlanoResumo[]>([]);
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [sel, setSel] = useState<Detalhe | null>(null);
-  const [novoPlano, setNovoPlano] = useState({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', prazoEm: '', releasedAt: '', analiseAtiva: false });
+  const [novoPlano, setNovoPlano] = useState({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
   const [modulosNovo, setModulosNovo] = useState<Modulo[]>([]);
-  const [novoItem, setNovoItem] = useState<{ titulo: string; descricao: string; tipo: TipoItem; aulaId: string; prazoEm: string }>({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '' });
+  const [novoItem, setNovoItem] = useState<{ titulo: string; descricao: string; tipo: TipoItem; aulaId: string; prazoEm: string; prazoDias: string }>({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
   const [aulasDoPlano, setAulasDoPlano] = useState<AulaOpt[]>([]);
   const [detAluno, setDetAluno] = useState<DetalheAluno | null>(null);
   const [analiseTexto, setAnaliseTexto] = useState('');
 
   // edição das configurações do plano selecionado
-  const [cfg, setCfg] = useState({ titulo: '', subtitulo: '', descricao: '', prazoEm: '', releasedAt: '', analiseAtiva: false });
+  const [cfg, setCfg] = useState({ titulo: '', subtitulo: '', descricao: '', prazoEm: '', releasedAt: '', agendamento: 'fixo', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
   const [capaPreview, setCapaPreview] = useState<string | null>(null);
   const [capaPath, setCapaPath] = useState<string | null>(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
@@ -64,8 +64,8 @@ export default function PlanosProdutorPage() {
   async function abrir(id: string) {
     const d = await api<Detalhe>(`/painel/planos/${id}`);
     setSel(d);
-    setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '' });
-    setCfg({ titulo: d.titulo, subtitulo: d.subtitulo ?? '', descricao: d.descricao ?? '', prazoEm: onlyDate(d.prazoEm), releasedAt: onlyDate(d.releasedAt), analiseAtiva: d.analiseAtiva });
+    setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
+    setCfg({ titulo: d.titulo, subtitulo: d.subtitulo ?? '', descricao: d.descricao ?? '', prazoEm: onlyDate(d.prazoEm), releasedAt: onlyDate(d.releasedAt), agendamento: d.agendamento ?? 'fixo', liberaAposDias: String(d.liberaAposDias ?? 0), prazoDias: d.prazoDias != null ? String(d.prazoDias) : '', analiseAtiva: d.analiseAtiva });
     setCapaPath(d.capaUrl);
     setCapaPreview(null);
     if (d.capaUrl) {
@@ -107,12 +107,20 @@ export default function PlanosProdutorPage() {
           descricao: novoPlano.descricao || undefined,
           trilhaId: novoPlano.trilhaId || undefined,
           moduloId: novoPlano.moduloId || undefined,
-          prazoEm: novoPlano.prazoEm ? new Date(novoPlano.prazoEm).toISOString() : undefined,
-          releasedAt: novoPlano.releasedAt ? new Date(novoPlano.releasedAt).toISOString() : undefined,
+          agendamento: novoPlano.agendamento,
+          ...(novoPlano.agendamento === 'relativo'
+            ? {
+                liberaAposDias: Number(novoPlano.liberaAposDias || 0),
+                ...(novoPlano.prazoDias !== '' ? { prazoDias: Number(novoPlano.prazoDias) } : {}),
+              }
+            : {
+                prazoEm: novoPlano.prazoEm ? new Date(novoPlano.prazoEm).toISOString() : undefined,
+                releasedAt: novoPlano.releasedAt ? new Date(novoPlano.releasedAt).toISOString() : undefined,
+              }),
           analiseAtiva: novoPlano.analiseAtiva,
         }),
       });
-      setNovoPlano({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', prazoEm: '', releasedAt: '', analiseAtiva: false });
+      setNovoPlano({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
       setModulosNovo([]);
       await carregar();
       await abrir(p.id);
@@ -131,8 +139,16 @@ export default function PlanosProdutorPage() {
           subtitulo: cfg.subtitulo,
           descricao: cfg.descricao,
           capaUrl: capaPath ?? '',
-          prazoEm: cfg.prazoEm ? new Date(cfg.prazoEm).toISOString() : '',
-          releasedAt: cfg.releasedAt ? new Date(cfg.releasedAt).toISOString() : '',
+          agendamento: cfg.agendamento,
+          ...(cfg.agendamento === 'relativo'
+            ? {
+                liberaAposDias: Number(cfg.liberaAposDias || 0),
+                ...(cfg.prazoDias !== '' ? { prazoDias: Number(cfg.prazoDias) } : {}),
+              }
+            : {
+                prazoEm: cfg.prazoEm ? new Date(cfg.prazoEm).toISOString() : '',
+                releasedAt: cfg.releasedAt ? new Date(cfg.releasedAt).toISOString() : '',
+              }),
           analiseAtiva: cfg.analiseAtiva,
         }),
       });
@@ -177,10 +193,12 @@ export default function PlanosProdutorPage() {
           descricao: novoItem.descricao || undefined,
           tipo: novoItem.tipo,
           aulaId: novoItem.tipo === 'assistir' || novoItem.tipo === 'resumo' ? novoItem.aulaId : undefined,
-          prazoEm: novoItem.prazoEm ? new Date(novoItem.prazoEm).toISOString() : undefined,
+          ...(sel.agendamento === 'relativo'
+            ? (novoItem.prazoDias !== '' ? { prazoDias: Number(novoItem.prazoDias) } : {})
+            : { prazoEm: novoItem.prazoEm ? new Date(novoItem.prazoEm).toISOString() : undefined }),
         }),
       });
-      setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '' });
+      setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
       await abrir(sel.id);
       await carregar();
     } catch (err) {
@@ -263,10 +281,21 @@ export default function PlanosProdutorPage() {
                   {modulosNovo.map((m) => <option key={m.id} value={m.id}>Módulo: {m.titulo}</option>)}
                 </select>
               )}
-              <div className="flex gap-2">
-                <label className="text-xs text-slate-500 flex-1">Liberação<input type="date" value={novoPlano.releasedAt} onChange={(e) => setNovoPlano({ ...novoPlano, releasedAt: e.target.value })} className={inp} /></label>
-                <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={novoPlano.prazoEm} onChange={(e) => setNovoPlano({ ...novoPlano, prazoEm: e.target.value })} className={inp} /></label>
-              </div>
+              <select value={novoPlano.agendamento} onChange={(e) => setNovoPlano({ ...novoPlano, agendamento: e.target.value })} className={inp}>
+                <option value="fixo">Datas fixas (calendário)</option>
+                <option value="relativo">Dias após o início (turmas/evergreen)</option>
+              </select>
+              {novoPlano.agendamento === 'relativo' ? (
+                <div className="flex gap-2">
+                  <label className="text-xs text-slate-500 flex-1">Libera (D+)<input type="number" min={0} value={novoPlano.liberaAposDias} onChange={(e) => setNovoPlano({ ...novoPlano, liberaAposDias: e.target.value })} className={inp} /></label>
+                  <label className="text-xs text-slate-500 flex-1">Entrega (D+)<input type="number" min={0} placeholder="sem prazo" value={novoPlano.prazoDias} onChange={(e) => setNovoPlano({ ...novoPlano, prazoDias: e.target.value })} className={inp} /></label>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <label className="text-xs text-slate-500 flex-1">Liberação<input type="date" value={novoPlano.releasedAt} onChange={(e) => setNovoPlano({ ...novoPlano, releasedAt: e.target.value })} className={inp} /></label>
+                  <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={novoPlano.prazoEm} onChange={(e) => setNovoPlano({ ...novoPlano, prazoEm: e.target.value })} className={inp} /></label>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={novoPlano.analiseAtiva} onChange={(e) => setNovoPlano({ ...novoPlano, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
               <button className="w-full bg-tribo-600 hover:bg-tribo-700 text-white font-semibold py-2 rounded-lg text-sm">Criar plano</button>
             </form>
@@ -298,10 +327,24 @@ export default function PlanosProdutorPage() {
                     <input placeholder="Título" value={cfg.titulo} onChange={(e) => setCfg({ ...cfg, titulo: e.target.value })} className={inp} />
                     <input placeholder="Subtítulo" value={cfg.subtitulo} onChange={(e) => setCfg({ ...cfg, subtitulo: e.target.value })} className={inp} />
                     <textarea placeholder="Descrição" value={cfg.descricao} onChange={(e) => setCfg({ ...cfg, descricao: e.target.value })} rows={2} className={inp} />
-                    <div className="flex gap-2">
-                      <label className="text-xs text-slate-500 flex-1">Liberação<input type="date" value={cfg.releasedAt} onChange={(e) => setCfg({ ...cfg, releasedAt: e.target.value })} className={inp} /></label>
-                      <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={cfg.prazoEm} onChange={(e) => setCfg({ ...cfg, prazoEm: e.target.value })} className={inp} /></label>
-                    </div>
+                    <select value={cfg.agendamento} onChange={(e) => setCfg({ ...cfg, agendamento: e.target.value })} className={inp}>
+                      <option value="fixo">Datas fixas (calendário)</option>
+                      <option value="relativo">Dias após o início (turmas/evergreen)</option>
+                    </select>
+                    {cfg.agendamento === 'relativo' ? (
+                      <>
+                        <div className="flex gap-2">
+                          <label className="text-xs text-slate-500 flex-1">Libera (D+)<input type="number" min={0} value={cfg.liberaAposDias} onChange={(e) => setCfg({ ...cfg, liberaAposDias: e.target.value })} className={inp} /></label>
+                          <label className="text-xs text-slate-500 flex-1">Entrega (D+)<input type="number" min={0} placeholder="sem prazo" value={cfg.prazoDias} onChange={(e) => setCfg({ ...cfg, prazoDias: e.target.value })} className={inp} /></label>
+                        </div>
+                        <p className="text-[11px] text-slate-400">Os dias contam a partir do início da turma do aluno (ou da matrícula, conforme a trilha).</p>
+                      </>
+                    ) : (
+                      <div className="flex gap-2">
+                        <label className="text-xs text-slate-500 flex-1">Liberação<input type="date" value={cfg.releasedAt} onChange={(e) => setCfg({ ...cfg, releasedAt: e.target.value })} className={inp} /></label>
+                        <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={cfg.prazoEm} onChange={(e) => setCfg({ ...cfg, prazoEm: e.target.value })} className={inp} /></label>
+                      </div>
+                    )}
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={cfg.analiseAtiva} onChange={(e) => setCfg({ ...cfg, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
                     <button onClick={salvarCfg} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar plano</button>
                   </div>
@@ -322,7 +365,7 @@ export default function PlanosProdutorPage() {
                           {it.aula && <span className="block text-xs text-slate-400">🎬 {it.aula.titulo}</span>}
                         </span>
                         <span className="flex items-center gap-3 text-xs text-slate-400 shrink-0">
-                          <span>⏰ {fmt(it.prazoEm)}</span>
+                          <span>⏰ {sel.agendamento === 'relativo' ? (it.prazoDias != null ? `D+${it.prazoDias}` : 'sem prazo') : fmt(it.prazoEm)}</span>
                           <button onClick={() => removerItem(it.id)} className="text-rose-500">remover</button>
                         </span>
                       </div>
@@ -346,7 +389,11 @@ export default function PlanosProdutorPage() {
                           {aulasDoPlano.map((a) => <option key={a.id} value={a.id}>{a.titulo}</option>)}
                         </select>
                       )}
-                      <input type="date" value={novoItem.prazoEm} onChange={(e) => setNovoItem({ ...novoItem, prazoEm: e.target.value })} className={`${inp} w-40`} />
+                      {sel.agendamento === 'relativo' ? (
+                        <input type="number" min={0} placeholder="Vence D+" value={novoItem.prazoDias} onChange={(e) => setNovoItem({ ...novoItem, prazoDias: e.target.value })} className={`${inp} w-32`} />
+                      ) : (
+                        <input type="date" value={novoItem.prazoEm} onChange={(e) => setNovoItem({ ...novoItem, prazoEm: e.target.value })} className={`${inp} w-40`} />
+                      )}
                       <button className="bg-slate-700 dark:bg-slate-600 text-white text-sm px-4 rounded-lg">+ Item</button>
                     </div>
                   </form>

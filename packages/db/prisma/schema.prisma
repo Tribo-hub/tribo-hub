@@ -322,8 +322,12 @@ model PlanoAcao {
   descricao    String?
   capaUrl      String? // caminho da capa no Storage (estilo card)
   ordem        Int       @default(1) // nº sequencial do plano (#1, #2…)
-  prazoEm      DateTime? // prazo de entrega do plano (deadline)
-  releasedAt   DateTime? // data de liberação ao aluno (antes disso: bloqueado)
+  prazoEm      DateTime? // prazo de entrega do plano (deadline) — modo fixo
+  releasedAt   DateTime? // data de liberação ao aluno (antes disso: bloqueado) — modo fixo
+  // Agendamento relativo (D+N): datas calculadas por aluno a partir da âncora (turma/drip/matrícula)
+  agendamento    String? @default("fixo") // fixo | relativo
+  liberaAposDias Int? // relativo: libera N dias após o início
+  prazoDias      Int? // relativo: entrega N dias após o início
   analiseAtiva Boolean   @default(false) // mentor decide se este plano terá análise escrita
   createdAt    DateTime  @default(now())
 
@@ -348,7 +352,8 @@ model PlanoItem {
   descricao String? // instruções (texto + links)
   tipo      PlanoItemTipo @default(check)
   aulaId    String? // aula vinculada (tipos assistir/resumo)
-  prazoEm   DateTime?
+  prazoEm   DateTime? // modo fixo
+  prazoDias Int? // modo relativo: vence N dias após o início
   ordem     Int           @default(1)
   createdAt DateTime      @default(now())
 

@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { PlanoItemTipo } from '@tribohub/db';
 
 export class CriarPlanoDto {
@@ -38,6 +38,20 @@ export class CriarPlanoDto {
   releasedAt?: string;
 
   @IsOptional()
+  @IsIn(['fixo', 'relativo'])
+  agendamento?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  liberaAposDias?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  prazoDias?: number;
+
+  @IsOptional()
   @IsBoolean()
   analiseAtiva?: boolean;
 }
@@ -50,6 +64,9 @@ export class AtualizarPlanoDto {
   @IsOptional() @IsString() @MaxLength(500) capaUrl?: string;
   @IsOptional() @IsDateString() prazoEm?: string;
   @IsOptional() @IsDateString() releasedAt?: string;
+  @IsOptional() @IsIn(['fixo', 'relativo']) agendamento?: string;
+  @IsOptional() @IsInt() @Min(0) liberaAposDias?: number;
+  @IsOptional() @IsInt() @Min(0) prazoDias?: number;
   @IsOptional() @IsBoolean() analiseAtiva?: boolean;
 }
 
@@ -74,12 +91,18 @@ export class CriarItemDto {
   @IsOptional()
   @IsDateString()
   prazoEm?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  prazoDias?: number;
 }
 
 export class AtualizarItemDto {
   @IsOptional() @IsString() @MaxLength(500) titulo?: string;
   @IsOptional() @IsString() @MaxLength(5000) descricao?: string;
   @IsOptional() @IsDateString() prazoEm?: string;
+  @IsOptional() @IsInt() @Min(0) prazoDias?: number;
 }
 
 // Reordenação de tarefas (drag & drop): lista de ids na nova ordem.
