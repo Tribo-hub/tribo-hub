@@ -322,6 +322,7 @@ export default function PlanosProdutorPage() {
                     <button onClick={() => fileRef.current?.click()} disabled={enviandoCapa} className="mt-2 w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700">
                       {enviandoCapa ? 'Enviando...' : capaPreview ? '🖼 Trocar capa' : '🖼 Enviar capa'}
                     </button>
+                    <p className="text-[11px] text-slate-400 mt-1 text-center">Formato retrato <b>2:3</b> — recomendado <b>800×1200 px</b> (JPG ou PNG).</p>
                   </div>
                   <div className="space-y-2">
                     <input placeholder="Título" value={cfg.titulo} onChange={(e) => setCfg({ ...cfg, titulo: e.target.value })} className={inp} />
