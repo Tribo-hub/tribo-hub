@@ -6,6 +6,7 @@ import {
   CreateAulaDto,
   CreateModuloDto,
   CreateTrilhaDto,
+  TurmaDto,
   UpdateTrilhaDto,
 } from './dto/conteudo.dto';
 
@@ -79,6 +80,54 @@ export class ConteudoService {
   async removerTrilha(user: AuthUser, id: string) {
     await this.trilhaDoUsuario(user, id);
     await this.prisma.trilha.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { ok: true };
+  }
+
+  // ---------- Turmas ----------
+  async listarTurmas(user: AuthUser, trilhaId: string) {
+    await this.trilhaDoUsuario(user, trilhaId);
+    return this.prisma.turma.findMany({ where: { trilhaId }, orderBy: { inicioEm: 'asc' } });
+  }
+
+  async criarTurma(user: AuthUser, trilhaId: string, dto: TurmaDto) {
+    const trilha = await this.trilhaDoUsuario(user, trilhaId);
+    const d = (v?: string | null) => (v ? new Date(v) : null);
+    return this.prisma.turma.create({
+      data: {
+        trilhaId,
+        contaId: trilha.contaId ?? user.contaId ?? '',
+        nome: dto.nome?.trim() || 'Nova turma',
+        inicioEm: d(dto.inicioEm),
+        matriculasAbremEm: d(dto.matriculasAbremEm),
+        matriculasFechamEm: d(dto.matriculasFechamEm),
+      },
+    });
+  }
+
+  private async turmaDoUsuario(user: AuthUser, turmaId: string) {
+    const turma = await this.prisma.turma.findUnique({ where: { id: turmaId } });
+    if (!turma) throw new NotFoundException('Turma não encontrada');
+    await this.trilhaDoUsuario(user, turma.trilhaId);
+    return turma;
+  }
+
+  async atualizarTurma(user: AuthUser, turmaId: string, dto: TurmaDto) {
+    await this.turmaDoUsuario(user, turmaId);
+    const data: Record<string, unknown> = {};
+    if (dto.nome !== undefined) data.nome = dto.nome.trim();
+    if (dto.ativa !== undefined) data.ativa = dto.ativa;
+    for (const k of ['inicioEm', 'matriculasAbremEm', 'matriculasFechamEm'] as const) {
+      if (dto[k] !== undefined) data[k] = dto[k] ? new Date(dto[k] as string) : null;
+    }
+    return this.prisma.turma.update({ where: { id: turmaId }, data });
+  }
+
+  async removerTurma(user: AuthUser, turmaId: string) {
+    await this.turmaDoUsuario(user, turmaId);
+    // não apaga matrículas; apenas remove o vínculo e desativa a turma
+    await this.prisma.matricula.updateMany({ where: { turmaId }, data: { turmaId: null } });
+    await this.prisma.oferta.updateMany({ where: { turmaId }, data: { turmaId: null } });
+    await this.prisma.turma.delete({ where: { id: turmaId } });
     return { ok: true };
   }
 

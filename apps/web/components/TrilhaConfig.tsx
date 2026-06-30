@@ -17,8 +17,17 @@ interface TrilhaCfg {
   whatsappUrl: string | null;
   dripBase?: string | null;
   dripInicioEm?: string | null;
+  usaTurmas?: boolean;
 }
 interface TrilhaItem { id: string; titulo: string }
+interface Turma {
+  id: string;
+  nome: string;
+  inicioEm: string | null;
+  matriculasAbremEm: string | null;
+  matriculasFechamEm: string | null;
+  ativa: boolean;
+}
 
 // Configurações de capa (estilo Netflix, 2:3) e de vitrine/oferta da trilha.
 export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: () => void }) {
@@ -32,6 +41,9 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
   const [whats, setWhats] = useState(trilha.whatsappUrl ?? '');
   const [dripBase, setDripBase] = useState(trilha.dripBase === 'fixa' ? 'fixa' : 'matricula');
   const [dripInicio, setDripInicio] = useState((trilha.dripInicioEm ?? '').slice(0, 10));
+  const [usaTurmas, setUsaTurmas] = useState(!!trilha.usaTurmas);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [novaTurma, setNovaTurma] = useState({ nome: '', inicioEm: '', abrem: '', fecham: '' });
   const [trilhas, setTrilhas] = useState<TrilhaItem[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [salvo, setSalvo] = useState(false);
@@ -39,7 +51,36 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
 
   useEffect(() => {
     api<TrilhaItem[]>('/painel/trilhas').then((ts) => setTrilhas(ts.filter((t) => t.id !== trilha.id))).catch(() => {});
+    carregarTurmas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trilha.id]);
+
+  function carregarTurmas() {
+    api<Turma[]>(`/painel/trilhas/${trilha.id}/turmas`).then(setTurmas).catch(() => {});
+  }
+  async function addTurma() {
+    if (!novaTurma.nome.trim() || !novaTurma.inicioEm) { alert('Informe o nome e a data de início da turma.'); return; }
+    try {
+      await api(`/painel/trilhas/${trilha.id}/turmas`, {
+        method: 'POST',
+        body: JSON.stringify({
+          nome: novaTurma.nome.trim(),
+          inicioEm: novaTurma.inicioEm || null,
+          matriculasAbremEm: novaTurma.abrem || null,
+          matriculasFechamEm: novaTurma.fecham || null,
+        }),
+      });
+      setNovaTurma({ nome: '', inicioEm: '', abrem: '', fecham: '' });
+      carregarTurmas();
+    } catch { alert('Falha ao criar a turma.'); }
+  }
+  async function toggleTurma(t: Turma) {
+    try { await api(`/painel/turmas/${t.id}`, { method: 'PATCH', body: JSON.stringify({ ativa: !t.ativa }) }); carregarTurmas(); } catch { /* ignore */ }
+  }
+  async function removeTurma(t: Turma) {
+    if (!confirm(`Excluir a turma "${t.nome}"? Os alunos não perdem o acesso, só o vínculo com a turma.`)) return;
+    try { await api(`/painel/turmas/${t.id}`, { method: 'DELETE' }); carregarTurmas(); } catch { /* ignore */ }
+  }
 
   // Preview da capa já salva (caminho do Storage → URL assinada).
   useEffect(() => {
@@ -85,6 +126,7 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
         whatsappUrl: whats,
         dripBase,
         dripInicioEm: dripBase === 'fixa' ? (dripInicio || null) : null,
+        usaTurmas,
       }),
     });
     setSalvo(true);
@@ -135,23 +177,62 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
         </div>
       </div>
 
-      {/* Liberação por tempo (drip) */}
+      {/* Liberação por tempo (drip) + Turmas */}
       <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-3">
-        <div>
-          <p className="text-sm font-medium">Liberação por tempo (drip)</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-            Para as aulas com "liberar após N dias", a contagem começa a partir de:
-          </p>
-          <select value={dripBase} onChange={(e) => setDripBase(e.target.value)} className={inp}>
-            <option value="matricula">Data da matrícula de cada aluno (turma sempre aberta)</option>
-            <option value="fixa">Data de início fixa do curso (turma com data única)</option>
-          </select>
-        </div>
-        {dripBase === 'fixa' && (
-          <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400">Data de início do curso</label>
-            <input type="date" value={dripInicio} onChange={(e) => setDripInicio(e.target.value)} className={inp} />
-            <p className="text-[11px] text-slate-400 mt-1">Todos os alunos seguem este calendário. Antes desta data, as aulas com drip ficam bloqueadas.</p>
+        <p className="text-sm font-medium">Liberação por tempo (drip)</p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={usaTurmas} onChange={(e) => setUsaTurmas(e.target.checked)} />
+          Trabalhar com <b>turmas</b> (cada turma tem sua data de início e janela de matrículas)
+        </label>
+
+        {usaTurmas ? (
+          <div className="pl-1 space-y-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              O drip de cada aluno conta a partir da <b>data de início da turma dele</b>. Em um único checkout, o aluno entra
+              automaticamente na turma com <b>matrículas abertas</b> no momento da compra.
+            </p>
+
+            {/* lista de turmas */}
+            <div className="space-y-2">
+              {turmas.length === 0 && <p className="text-xs text-slate-400">Nenhuma turma ainda.</p>}
+              {turmas.map((t) => (
+                <div key={t.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 ${t.ativa ? '' : 'opacity-50'}`}>
+                  <span className="font-medium">{t.nome}</span>
+                  <span className="text-xs text-slate-400">início {t.inicioEm ? new Date(t.inicioEm).toLocaleDateString('pt-BR') : '—'}</span>
+                  <span className="text-xs text-slate-400">
+                    matrículas {t.matriculasAbremEm ? new Date(t.matriculasAbremEm).toLocaleDateString('pt-BR') : '—'} → {t.matriculasFechamEm ? new Date(t.matriculasFechamEm).toLocaleDateString('pt-BR') : '—'}
+                  </span>
+                  <div className="ml-auto flex items-center gap-3">
+                    <button type="button" onClick={() => toggleTurma(t)} className="text-xs text-slate-500 hover:text-tribo-600">{t.ativa ? 'desativar' : 'ativar'}</button>
+                    <button type="button" onClick={() => removeTurma(t)} className="text-xs text-rose-500">excluir</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* nova turma */}
+            <div className="grid sm:grid-cols-4 gap-2 text-sm items-end">
+              <label className="block">Nome da turma<input value={novaTurma.nome} onChange={(e) => setNovaTurma({ ...novaTurma, nome: e.target.value })} placeholder="Turma Fev/26" className={inp} /></label>
+              <label className="block">Início do curso<input type="date" value={novaTurma.inicioEm} onChange={(e) => setNovaTurma({ ...novaTurma, inicioEm: e.target.value })} className={inp} /></label>
+              <label className="block">Matrículas abrem<input type="date" value={novaTurma.abrem} onChange={(e) => setNovaTurma({ ...novaTurma, abrem: e.target.value })} className={inp} /></label>
+              <label className="block">Matrículas fecham<input type="date" value={novaTurma.fecham} onChange={(e) => setNovaTurma({ ...novaTurma, fecham: e.target.value })} className={inp} /></label>
+            </div>
+            <button type="button" onClick={addTurma} className="text-xs bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg">+ adicionar turma</button>
+          </div>
+        ) : (
+          <div className="pl-1 space-y-2">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Para as aulas com "liberar após N dias", a contagem começa a partir de:</p>
+            <select value={dripBase} onChange={(e) => setDripBase(e.target.value)} className={inp}>
+              <option value="matricula">Data da matrícula de cada aluno (sempre aberto)</option>
+              <option value="fixa">Data de início fixa do curso (data única)</option>
+            </select>
+            {dripBase === 'fixa' && (
+              <div>
+                <label className="text-xs text-slate-500 dark:text-slate-400">Data de início do curso</label>
+                <input type="date" value={dripInicio} onChange={(e) => setDripInicio(e.target.value)} className={inp} />
+                <p className="text-[11px] text-slate-400 mt-1">Todos os alunos seguem este calendário. Antes desta data, as aulas com drip ficam bloqueadas.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -7,11 +7,16 @@ import {
   IsString,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 
 export class CreateOfertaDto {
   @IsString()
   trilhaId!: string;
+
+  @IsOptional()
+  @IsString()
+  turmaId?: string | null;
 
   @IsString()
   @MaxLength(255)
@@ -27,6 +32,39 @@ export class CreateOfertaDto {
 
   @IsEnum(TipoAcesso)
   tipoAcesso!: TipoAcesso;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  duracaoAcessoDias?: number;
+}
+
+export class UpdateOfertaDto {
+  @IsOptional()
+  @IsString()
+  trilhaId?: string;
+
+  @IsOptional()
+  @IsString()
+  turmaId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  nome?: string;
+
+  @IsOptional()
+  @IsEnum(PlataformaExterna)
+  plataformaExterna?: PlataformaExterna;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  codigoProdutoExterno?: string;
+
+  @IsOptional()
+  @IsEnum(TipoAcesso)
+  tipoAcesso?: TipoAcesso;
 
   @IsOptional()
   @IsInt()
@@ -55,6 +93,10 @@ export class CortesiaDto {
   trilhaId!: string;
 
   @IsOptional()
+  @IsString()
+  turmaId?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   duracaoAcessoDias?: number;
@@ -64,4 +106,26 @@ export class ProrrogarDto {
   @IsInt()
   @Min(1)
   dias!: number;
+}
+
+export class EditarAlunoDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  nome?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  telefone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(72)
+  senha?: string;
 }

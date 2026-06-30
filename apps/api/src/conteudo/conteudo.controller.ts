@@ -18,6 +18,9 @@ import {
   CreateAulaDto,
   CreateModuloDto,
   CreateTrilhaDto,
+  CriarPerguntaDto,
+  ResponderComentarioDto,
+  TurmaDto,
   UpdateAulaDto,
   UpdateModuloDto,
   UpdateTrilhaDto,
@@ -57,6 +60,27 @@ export class ConteudoController {
   @Delete('trilhas/:id')
   removerTrilha(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.conteudo.removerTrilha(u, id);
+  }
+
+  // Turmas
+  @Get('trilhas/:id/turmas')
+  listarTurmas(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.listarTurmas(u, id);
+  }
+
+  @Post('trilhas/:id/turmas')
+  criarTurma(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: TurmaDto) {
+    return this.conteudo.criarTurma(u, id, dto);
+  }
+
+  @Patch('turmas/:id')
+  atualizarTurma(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: TurmaDto) {
+    return this.conteudo.atualizarTurma(u, id, dto);
+  }
+
+  @Delete('turmas/:id')
+  removerTurma(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.removerTurma(u, id);
   }
 
   // Módulos
@@ -105,5 +129,42 @@ export class ConteudoController {
   @Delete('aulas/:id')
   removerAula(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.conteudo.removerAula(u, id);
+  }
+
+  // Quiz da aula
+  @Get('aulas/:id/perguntas')
+  listarPerguntas(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.listarPerguntas(u, id);
+  }
+
+  @Post('aulas/:id/perguntas')
+  criarPergunta(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: CriarPerguntaDto) {
+    return this.conteudo.criarPergunta(u, id, dto.pergunta);
+  }
+
+  @Delete('perguntas/:id')
+  removerPergunta(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.removerPergunta(u, id);
+  }
+
+  @Get('perguntas/:id/respostas')
+  listarRespostas(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.listarRespostas(u, id);
+  }
+
+  // Comentários da aula (moderação/resposta do produtor)
+  @Get('aulas/:id/comentarios')
+  listarComentarios(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.listarComentariosAula(u, id);
+  }
+
+  @Post('aulas/:id/comentarios')
+  responderComentario(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ResponderComentarioDto) {
+    return this.conteudo.responderComentario(u, id, dto.texto, dto.respostaAId);
+  }
+
+  @Delete('comentarios/:id')
+  removerComentario(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.conteudo.removerComentarioModeracao(u, id);
   }
 }

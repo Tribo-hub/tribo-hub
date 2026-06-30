@@ -141,9 +141,15 @@ export class AlunoService {
     const concluidas = new Set(progresso.filter((p) => p.concluido).map((p) => p.aulaId));
     const avaliacoes = new Map(progresso.map((p) => [p.aulaId, p.avaliacao]));
 
-    // baseline do drip content: configurável por trilha (data fixa de início OU data da matrícula).
+    // baseline do drip content: turma do aluno (se a trilha usa turmas) > data fixa > data da matrícula.
     let inicio: Date | null = null;
-    if (trilha.dripBase === 'fixa' && trilha.dripInicioEm) {
+    if (trilha.usaTurmas) {
+      const mat = await this.prisma.matricula.findFirst({
+        where: { usuarioId: user.sub, trilhaId: id },
+        select: { createdAt: true, turma: { select: { inicioEm: true } } },
+      });
+      inicio = mat?.turma?.inicioEm ?? mat?.createdAt ?? null;
+    } else if (trilha.dripBase === 'fixa' && trilha.dripInicioEm) {
       inicio = trilha.dripInicioEm;
     } else {
       const matricula = await this.prisma.matricula.findFirst({
@@ -151,10 +157,10 @@ export class AlunoService {
         select: { createdAt: true },
       });
       inicio = matricula?.createdAt ?? null;
-      if (!inicio) {
-        const u = await this.prisma.usuario.findUnique({ where: { id: user.sub }, select: { createdAt: true } });
-        inicio = u?.createdAt ?? new Date();
-      }
+    }
+    if (!inicio) {
+      const u = await this.prisma.usuario.findUnique({ where: { id: user.sub }, select: { createdAt: true } });
+      inicio = u?.createdAt ?? new Date();
     }
     const diasDeAcesso = (Date.now() - inicio.getTime()) / 86_400_000;
 

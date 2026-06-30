@@ -92,6 +92,33 @@ export class UpdateTrilhaDto {
   @IsOptional()
   @IsString()
   dripInicioEm?: string | null; // data ISO (yyyy-mm-dd) quando dripBase = fixa
+
+  @IsOptional()
+  @IsBoolean()
+  usaTurmas?: boolean;
+}
+
+export class TurmaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nome?: string;
+
+  @IsOptional()
+  @IsString()
+  inicioEm?: string | null;
+
+  @IsOptional()
+  @IsString()
+  matriculasAbremEm?: string | null;
+
+  @IsOptional()
+  @IsString()
+  matriculasFechamEm?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  ativa?: boolean;
 }
 
 export class CreateModuloDto {

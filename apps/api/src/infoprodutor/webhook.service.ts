@@ -114,7 +114,8 @@ export class WebhookService {
           oferta.tipoAcesso === 'vitalicio'
             ? null
             : new Date(Date.now() + (oferta.duracaoAcessoDias ?? 365) * 86400000);
-        await this.info.upsertMatricula(contaId, aluno.id, oferta.trilhaId, 'compra', expira, trans.id);
+        const turmaId = await this.info.resolverTurma(oferta.trilhaId, oferta.turmaId);
+        await this.info.upsertMatricula(contaId, aluno.id, oferta.trilhaId, 'compra', expira, trans.id, turmaId);
 
         let tokenAtivacao: string | null = null;
         if (!existente) {
@@ -130,6 +131,17 @@ export class WebhookService {
           });
         }
         await this.email.acessoLiberado(ev.email, ev.nome, oferta.nome, tokenAtivacao).catch(() => {});
+        await this.prisma.notificacao
+          .create({
+            data: {
+              usuarioId: aluno.id,
+              contaId,
+              titulo: 'Acesso liberado 🎉',
+              mensagem: `Sua matrícula em "${oferta.nome}" está ativa. Bons estudos!`,
+              tipo: 'matricula',
+            },
+          })
+          .catch(() => undefined);
         resultado = 'acesso_liberado';
       } else if (oferta && ev.email && ev.tipo === 'revoga') {
         const aluno = await this.prisma.usuario.findFirst({

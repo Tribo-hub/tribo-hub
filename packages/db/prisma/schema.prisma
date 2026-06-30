@@ -192,6 +192,7 @@ model Trilha {
   // Drip content: base da contagem de "liberar após N dias"
   dripBase          String? // matricula (default) | fixa
   dripInicioEm      DateTime? // data de início fixa do curso (quando dripBase = fixa)
+  usaTurmas         Boolean   @default(false) // turmas com datas próprias (drip parte da data da turma do aluno)
   deletedAt        DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -201,10 +202,32 @@ model Trilha {
   ofertas      Oferta[]
   matriculas   Matricula[]
   certificados Certificado[]
+  turmas       Turma[]
 
   @@index([contaId])
   @@index([proprietarioTipo])
   @@map("trilhas")
+}
+
+// Turma de uma trilha (cohort) — data de início própria + janela de matrículas.
+model Turma {
+  id                 String    @id @default(uuid())
+  trilhaId           String
+  contaId            String
+  nome               String
+  inicioEm           DateTime? // data de início do curso (base do drip desta turma)
+  matriculasAbremEm  DateTime?
+  matriculasFechamEm DateTime?
+  ativa              Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  trilha     Trilha      @relation(fields: [trilhaId], references: [id])
+  matriculas Matricula[]
+  ofertas    Oferta[]
+
+  @@index([trilhaId])
+  @@map("turmas")
 }
 
 model Modulo {
@@ -543,6 +566,7 @@ model Oferta {
   id                   String            @id @default(uuid())
   contaId              String
   trilhaId             String
+  turmaId              String? // opcional: vincula a oferta a uma turma específica (Fase Turmas)
   nome                 String
   plataformaExterna    PlataformaExterna @default(hotmart)
   codigoProdutoExterno String? // id do produto na Hotmart/Eduzz/Kiwify
@@ -554,6 +578,7 @@ model Oferta {
 
   conta      Conta       @relation(fields: [contaId], references: [id])
   trilha     Trilha      @relation(fields: [trilhaId], references: [id])
+  turma      Turma?      @relation(fields: [turmaId], references: [id])
   matriculas Matricula[]
 
   @@unique([contaId, plataformaExterna, codigoProdutoExterno])
@@ -567,6 +592,7 @@ model Matricula {
   usuarioId   String
   trilhaId    String
   ofertaId    String?
+  turmaId     String? // turma do aluno nesta trilha (Fase Turmas)
   contaId     String
   origem      OrigemMatricula @default(compra)
   status      StatusMatricula @default(ativa)
@@ -578,6 +604,7 @@ model Matricula {
   usuario   Usuario    @relation(fields: [usuarioId], references: [id])
   trilha    Trilha     @relation(fields: [trilhaId], references: [id])
   oferta    Oferta?    @relation(fields: [ofertaId], references: [id])
+  turma     Turma?     @relation(fields: [turmaId], references: [id])
   conta     Conta      @relation(fields: [contaId], references: [id])
   transacao Transacao? @relation(fields: [transacaoId], references: [id])
 
