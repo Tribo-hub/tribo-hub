@@ -85,7 +85,7 @@ export default function PlanosAlunoPage() {
               const concluido = p.entregue;
               const Card = (
                 <div className={`ui-card overflow-hidden h-full flex flex-col ${p.bloqueado ? 'opacity-80' : 'hover:shadow-md transition'}`}>
-                  <div className="relative">
+                  <div className="relative w-3/5 mx-auto">
                     {p.capaUrl ? (
                       <img src={p.capaUrl} alt={p.titulo} className="aspect-[2/3] w-full object-cover" />
                     ) : (
