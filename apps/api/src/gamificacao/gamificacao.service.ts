@@ -79,6 +79,18 @@ export class GamificacaoService {
     }
   }
 
+  // Premiação com XP EXPLÍCITO (ex.: entrega de plano, com penalidade já aplicada). Idempotente.
+  async registrarXp(user: AuthUser, tipo: string, refId: string, xp: number, trilhaId: string | null) {
+    if (!user.contaId || !xp || xp <= 0) return;
+    try {
+      await this.prisma.xpEvento.create({
+        data: { usuarioId: user.sub, contaId: user.contaId, trilhaId, tipo, refId, xp: Math.round(xp) },
+      });
+    } catch {
+      // já existe (unique) — ignora
+    }
+  }
+
   // ---------- Aluno: visão geral (resumo global + cards por trilha) ----------
   async resumo(user: AuthUser) {
     const conta = await this.prisma.conta.findUnique({ where: { id: user.contaId! } });

@@ -11,7 +11,7 @@ interface AulaRef { id: string; titulo: string; trilhaId: string }
 interface PlanoResumo { id: string; titulo: string; subtitulo: string | null; ordem: number; trilhaTitulo: string | null; agendamento?: string; totalItens: number; entregas: number }
 interface Item { id: string; titulo: string; descricao: string | null; tipo: TipoItem; prazoEm: string | null; prazoDias: number | null; ordem: number; aula: AulaRef | null }
 interface Aluno { id: string; nome: string; email: string; totalItens: number; concluidos: number; atrasados: number; emDia: boolean; percentual: number; entregue: boolean; entregaStatus: string | null; diasAntesDoPrazo: number | null }
-interface Detalhe { id: string; titulo: string; subtitulo: string | null; descricao: string | null; capaUrl: string | null; ordem: number; prazoEm: string | null; releasedAt: string | null; agendamento: string; liberaAposDias: number | null; prazoDias: number | null; analiseAtiva: boolean; trilhaId: string | null; moduloId: string | null; itens: Item[]; acompanhamento: Aluno[] }
+interface Detalhe { id: string; titulo: string; subtitulo: string | null; descricao: string | null; capaUrl: string | null; ordem: number; prazoEm: string | null; releasedAt: string | null; agendamento: string; liberaAposDias: number | null; prazoDias: number | null; xpEntrega: number; penalizarAtraso: boolean; penalidadeAtrasoPct: number | null; analiseAtiva: boolean; trilhaId: string | null; moduloId: string | null; itens: Item[]; acompanhamento: Aluno[] }
 interface Trilha { id: string; titulo: string }
 interface AulaOpt { id: string; titulo: string }
 interface Modulo { id: string; titulo: string; aulas: AulaOpt[] }
@@ -27,7 +27,7 @@ export default function PlanosProdutorPage() {
   const [planos, setPlanos] = useState<PlanoResumo[]>([]);
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [sel, setSel] = useState<Detalhe | null>(null);
-  const [novoPlano, setNovoPlano] = useState({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
+  const [novoPlano, setNovoPlano] = useState({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', xpEntrega: '0', penalizarAtraso: false, penalidadeAtrasoPct: '20', analiseAtiva: false });
   const [modulosNovo, setModulosNovo] = useState<Modulo[]>([]);
   const [novoItem, setNovoItem] = useState<{ titulo: string; descricao: string; tipo: TipoItem; aulaId: string; prazoEm: string; prazoDias: string }>({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
   const [aulasDoPlano, setAulasDoPlano] = useState<AulaOpt[]>([]);
@@ -35,7 +35,7 @@ export default function PlanosProdutorPage() {
   const [analiseTexto, setAnaliseTexto] = useState('');
 
   // edição das configurações do plano selecionado
-  const [cfg, setCfg] = useState({ titulo: '', subtitulo: '', descricao: '', prazoEm: '', releasedAt: '', agendamento: 'fixo', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
+  const [cfg, setCfg] = useState({ titulo: '', subtitulo: '', descricao: '', prazoEm: '', releasedAt: '', agendamento: 'fixo', liberaAposDias: '0', prazoDias: '', xpEntrega: '0', penalizarAtraso: false, penalidadeAtrasoPct: '20', analiseAtiva: false });
   const [capaPreview, setCapaPreview] = useState<string | null>(null);
   const [capaPath, setCapaPath] = useState<string | null>(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
@@ -65,7 +65,7 @@ export default function PlanosProdutorPage() {
     const d = await api<Detalhe>(`/painel/planos/${id}`);
     setSel(d);
     setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
-    setCfg({ titulo: d.titulo, subtitulo: d.subtitulo ?? '', descricao: d.descricao ?? '', prazoEm: onlyDate(d.prazoEm), releasedAt: onlyDate(d.releasedAt), agendamento: d.agendamento ?? 'fixo', liberaAposDias: String(d.liberaAposDias ?? 0), prazoDias: d.prazoDias != null ? String(d.prazoDias) : '', analiseAtiva: d.analiseAtiva });
+    setCfg({ titulo: d.titulo, subtitulo: d.subtitulo ?? '', descricao: d.descricao ?? '', prazoEm: onlyDate(d.prazoEm), releasedAt: onlyDate(d.releasedAt), agendamento: d.agendamento ?? 'fixo', liberaAposDias: String(d.liberaAposDias ?? 0), prazoDias: d.prazoDias != null ? String(d.prazoDias) : '', xpEntrega: String(d.xpEntrega ?? 0), penalizarAtraso: d.penalizarAtraso, penalidadeAtrasoPct: d.penalidadeAtrasoPct != null ? String(d.penalidadeAtrasoPct) : '20', analiseAtiva: d.analiseAtiva });
     setCapaPath(d.capaUrl);
     setCapaPreview(null);
     if (d.capaUrl) {
@@ -117,10 +117,13 @@ export default function PlanosProdutorPage() {
                 prazoEm: novoPlano.prazoEm ? new Date(novoPlano.prazoEm).toISOString() : undefined,
                 releasedAt: novoPlano.releasedAt ? new Date(novoPlano.releasedAt).toISOString() : undefined,
               }),
+          xpEntrega: Number(novoPlano.xpEntrega || 0),
+          penalizarAtraso: novoPlano.penalizarAtraso,
+          ...(novoPlano.penalizarAtraso ? { penalidadeAtrasoPct: Number(novoPlano.penalidadeAtrasoPct || 0) } : {}),
           analiseAtiva: novoPlano.analiseAtiva,
         }),
       });
-      setNovoPlano({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', analiseAtiva: false });
+      setNovoPlano({ titulo: '', subtitulo: '', descricao: '', trilhaId: '', moduloId: '', agendamento: 'fixo', prazoEm: '', releasedAt: '', liberaAposDias: '0', prazoDias: '', xpEntrega: '0', penalizarAtraso: false, penalidadeAtrasoPct: '20', analiseAtiva: false });
       setModulosNovo([]);
       await carregar();
       await abrir(p.id);
@@ -149,6 +152,9 @@ export default function PlanosProdutorPage() {
                 prazoEm: cfg.prazoEm ? new Date(cfg.prazoEm).toISOString() : '',
                 releasedAt: cfg.releasedAt ? new Date(cfg.releasedAt).toISOString() : '',
               }),
+          xpEntrega: Number(cfg.xpEntrega || 0),
+          penalizarAtraso: cfg.penalizarAtraso,
+          ...(cfg.penalizarAtraso ? { penalidadeAtrasoPct: Number(cfg.penalidadeAtrasoPct || 0) } : {}),
           analiseAtiva: cfg.analiseAtiva,
         }),
       });
@@ -296,6 +302,11 @@ export default function PlanosProdutorPage() {
                   <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={novoPlano.prazoEm} onChange={(e) => setNovoPlano({ ...novoPlano, prazoEm: e.target.value })} className={inp} /></label>
                 </div>
               )}
+              <label className="text-xs text-slate-500 block">XP por entregar<input type="number" min={0} value={novoPlano.xpEntrega} onChange={(e) => setNovoPlano({ ...novoPlano, xpEntrega: e.target.value })} className={inp} /></label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={novoPlano.penalizarAtraso} onChange={(e) => setNovoPlano({ ...novoPlano, penalizarAtraso: e.target.checked })} /> Reduzir XP se entregar fora do prazo</label>
+              {novoPlano.penalizarAtraso && (
+                <label className="text-xs text-slate-500 block">Redução (%)<input type="number" min={0} max={100} value={novoPlano.penalidadeAtrasoPct} onChange={(e) => setNovoPlano({ ...novoPlano, penalidadeAtrasoPct: e.target.value })} className={inp} /></label>
+              )}
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={novoPlano.analiseAtiva} onChange={(e) => setNovoPlano({ ...novoPlano, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
               <button className="w-full bg-tribo-600 hover:bg-tribo-700 text-white font-semibold py-2 rounded-lg text-sm">Criar plano</button>
             </form>
@@ -346,6 +357,13 @@ export default function PlanosProdutorPage() {
                         <label className="text-xs text-slate-500 flex-1">Prazo<input type="date" value={cfg.prazoEm} onChange={(e) => setCfg({ ...cfg, prazoEm: e.target.value })} className={inp} /></label>
                       </div>
                     )}
+                    <div className="flex gap-2 items-end">
+                      <label className="text-xs text-slate-500 flex-1">XP por entregar<input type="number" min={0} value={cfg.xpEntrega} onChange={(e) => setCfg({ ...cfg, xpEntrega: e.target.value })} className={inp} /></label>
+                      {cfg.penalizarAtraso && (
+                        <label className="text-xs text-slate-500 flex-1">Redução no atraso (%)<input type="number" min={0} max={100} value={cfg.penalidadeAtrasoPct} onChange={(e) => setCfg({ ...cfg, penalidadeAtrasoPct: e.target.value })} className={inp} /></label>
+                      )}
+                    </div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={cfg.penalizarAtraso} onChange={(e) => setCfg({ ...cfg, penalizarAtraso: e.target.checked })} /> Reduzir XP se entregar fora do prazo</label>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={cfg.analiseAtiva} onChange={(e) => setCfg({ ...cfg, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
                     <button onClick={salvarCfg} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar plano</button>
                   </div>

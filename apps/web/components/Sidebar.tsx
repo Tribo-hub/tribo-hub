@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Clapperboard, Cable, Ticket, Calendar, ListChecks, Bot, Palette,
   Puzzle, Users, Shield, CreditCard, Settings, ExternalLink, Sun, Moon, LogOut,
-  ChevronLeft, ChevronRight, KeyRound, BarChart3, Handshake, type LucideIcon,
+  ChevronLeft, ChevronRight, KeyRound, BarChart3, Handshake, UserCog, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
 import { lerMarca, salvarMarca } from '../lib/marca';
@@ -72,9 +72,22 @@ export function Sidebar({ area, mobileOpen = false, onClose }: { area: 'painel' 
       /* ignore */
     }
     if (area === 'painel') {
-      api<{ conta?: { tipoConta: string; nome: string; corPrimaria?: string | null; logoUrl?: string | null } }>('/me')
+      api<{ funcaoEquipe?: string | null; conta?: { tipoConta: string; nome: string; corPrimaria?: string | null; logoUrl?: string | null } }>('/me')
         .then((m) => {
-          setItens(m.conta?.tipoConta === 'corporativo' ? CORP : INFO);
+          const base = m.conta?.tipoConta === 'corporativo' ? CORP : INFO;
+          const eq = m.funcaoEquipe ?? null;
+          let itensFinais: Item[];
+          if (eq === 'atendente') {
+            // só atendimento
+            itensFinais = base.filter((i) => ['/painel/dashboard', '/painel/matriculas'].includes(i.href));
+          } else if (eq === 'gerente') {
+            // tudo, menos funcionários e assinatura
+            itensFinais = base.filter((i) => i.href !== '/painel/assinatura');
+          } else {
+            // dono: tudo + Funcionários
+            itensFinais = [...base, { href: '/painel/funcionarios', label: 'Funcionários', icon: UserCog }];
+          }
+          setItens(itensFinais);
           if (m.conta?.nome) setMarca(m.conta.nome);
           setCor(m.conta?.corPrimaria ?? null);
           setLogo(m.conta?.logoUrl ?? null);

@@ -92,7 +92,7 @@ export class AuthService {
       },
     });
 
-    const tokens = await this.emitirTokens(user.id, user.role, user.contaId, sid);
+    const tokens = await this.emitirTokens(user.id, user.role, user.contaId, sid, user.funcaoEquipe);
     return {
       ...tokens,
       usuario: {
@@ -160,7 +160,7 @@ export class AuthService {
         await this.prisma.usuario.update({ where: { id: user.id }, data: { sessaoAtual: sid } });
       }
     }
-    return this.emitirTokens(user.id, user.role, user.contaId, sid);
+    return this.emitirTokens(user.id, user.role, user.contaId, sid, user.funcaoEquipe);
   }
 
   async aceitarConvite(token: string, senha: string) {
@@ -236,8 +236,9 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async emitirTokens(sub: string, role: string, contaId: string | null, sid?: string | null) {
-    const accessPayload = sid ? { sub, role, contaId, sid, su: true } : { sub, role, contaId };
+  private async emitirTokens(sub: string, role: string, contaId: string | null, sid?: string | null, funcaoEquipe?: string | null) {
+    const base = { sub, role, contaId, ...(funcaoEquipe ? { eq: funcaoEquipe } : {}) };
+    const accessPayload = sid ? { ...base, sid, su: true } : base;
     const accessToken = await this.jwt.signAsync(
       accessPayload,
       { secret: env.JWT_ACCESS_SECRET, expiresIn: env.JWT_ACCESS_EXPIRES },

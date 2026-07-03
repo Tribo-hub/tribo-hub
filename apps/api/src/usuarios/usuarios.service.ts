@@ -20,6 +20,7 @@ export class UsuariosService {
         email: true,
         telefone: true,
         role: true,
+        funcaoEquipe: true,
         contaId: true,
         avatarUrl: true,
         ultimoAcesso: true,

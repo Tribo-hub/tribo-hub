@@ -35,6 +35,9 @@ export class PlanosService {
         agendamento: dto.agendamento ?? 'fixo',
         liberaAposDias: dto.liberaAposDias ?? null,
         prazoDias: dto.prazoDias ?? null,
+        xpEntrega: dto.xpEntrega ?? 0,
+        penalizarAtraso: dto.penalizarAtraso ?? false,
+        penalidadeAtrasoPct: dto.penalidadeAtrasoPct ?? null,
         analiseAtiva: dto.analiseAtiva ?? false,
         ordem: (max._max.ordem ?? 0) + 1,
       },
@@ -55,6 +58,9 @@ export class PlanosService {
         ...(dto.agendamento !== undefined ? { agendamento: dto.agendamento } : {}),
         ...(dto.liberaAposDias !== undefined ? { liberaAposDias: dto.liberaAposDias } : {}),
         ...(dto.prazoDias !== undefined ? { prazoDias: dto.prazoDias } : {}),
+        ...(dto.xpEntrega !== undefined ? { xpEntrega: dto.xpEntrega } : {}),
+        ...(dto.penalizarAtraso !== undefined ? { penalizarAtraso: dto.penalizarAtraso } : {}),
+        ...(dto.penalidadeAtrasoPct !== undefined ? { penalidadeAtrasoPct: dto.penalidadeAtrasoPct } : {}),
         ...(dto.analiseAtiva !== undefined ? { analiseAtiva: dto.analiseAtiva } : {}),
       },
     });
@@ -145,6 +151,9 @@ export class PlanosService {
       agendamento: plano.agendamento ?? 'fixo',
       liberaAposDias: plano.liberaAposDias,
       prazoDias: plano.prazoDias,
+      xpEntrega: plano.xpEntrega,
+      penalizarAtraso: plano.penalizarAtraso,
+      penalidadeAtrasoPct: plano.penalidadeAtrasoPct,
       analiseAtiva: plano.analiseAtiva,
       trilhaId: plano.trilhaId,
       moduloId: plano.moduloId,
@@ -469,6 +478,13 @@ export class PlanosService {
     const entrega = await this.prisma.planoEntrega.create({
       data: { planoId, usuarioId: user.sub, contaId: user.contaId!, status: PlanoEntregaStatus.submitted, diasAntesDoPrazo },
     });
+
+    // XP da entrega (com redução opcional se entregue fora do prazo)
+    if (plano.xpEntrega > 0) {
+      const atrasado = diasAntesDoPrazo != null && diasAntesDoPrazo < 0;
+      const fator = atrasado && plano.penalizarAtraso ? Math.max(0, 1 - (plano.penalidadeAtrasoPct ?? 0) / 100) : 1;
+      await this.gamificacao.registrarXp(user, 'plano_entrega', planoId, plano.xpEntrega * fator, plano.trilhaId);
+    }
     return { ok: true, status: entrega.status, diasAntesDoPrazo };
   }
 

@@ -4,6 +4,7 @@ export interface AuthUser {
   sub: string;
   role: string;
   contaId: string | null;
+  eq?: string | null; // função na equipe (gerente | atendente); null = dono
 }
 
 export const CurrentUser = createParamDecorator(

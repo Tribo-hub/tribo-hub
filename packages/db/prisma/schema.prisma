@@ -150,6 +150,7 @@ model Usuario {
   sessaoAtual      String? // id da sessão ativa (anti-compartilhamento)
   senhaHash        String
   role             Role
+  funcaoEquipe     String? // Fase Equipe: gerente | atendente (null = dono/normal), só p/ role admin_tenant
   ativo            Boolean   @default(true)
   avatarUrl        String?
   ultimoAcesso     DateTime?
@@ -328,6 +329,10 @@ model PlanoAcao {
   agendamento    String? @default("fixo") // fixo | relativo
   liberaAposDias Int? // relativo: libera N dias após o início
   prazoDias      Int? // relativo: entrega N dias após o início
+  // Pontuação (XP) da entrega + penalidade opcional por atraso
+  xpEntrega          Int     @default(0) // XP concedido ao entregar o plano
+  penalizarAtraso    Boolean @default(false) // reduz o XP quando entregue fora do prazo
+  penalidadeAtrasoPct Int?   // % de redução do XP no atraso
   analiseAtiva Boolean   @default(false) // mentor decide se este plano terá análise escrita
   createdAt    DateTime  @default(now())
 

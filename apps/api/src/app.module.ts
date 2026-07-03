@@ -10,10 +10,12 @@ import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { SubscriptionStatusGuard } from './common/guards/subscription-status.guard';
+import { EquipeGuard } from './common/guards/equipe.guard';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
 import { CorporativoModule } from './corporativo/corporativo.module';
 import { EmailModule } from './email/email.module';
+import { EquipeModule } from './equipe/equipe.module';
 import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
@@ -42,11 +44,13 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     AgendaModule,
     PlanosModule,
     GamificacaoModule,
+    EquipeModule,
   ],
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SubscriptionStatusGuard },
+    { provide: APP_GUARD, useClass: EquipeGuard },
   ],
 })
 export class AppModule implements NestModule {

@@ -52,6 +52,20 @@ export class CriarPlanoDto {
   prazoDias?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  xpEntrega?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  penalizarAtraso?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  penalidadeAtrasoPct?: number;
+
+  @IsOptional()
   @IsBoolean()
   analiseAtiva?: boolean;
 }
@@ -67,6 +81,9 @@ export class AtualizarPlanoDto {
   @IsOptional() @IsIn(['fixo', 'relativo']) agendamento?: string;
   @IsOptional() @IsInt() @Min(0) liberaAposDias?: number;
   @IsOptional() @IsInt() @Min(0) prazoDias?: number;
+  @IsOptional() @IsInt() @Min(0) xpEntrega?: number;
+  @IsOptional() @IsBoolean() penalizarAtraso?: boolean;
+  @IsOptional() @IsInt() @Min(0) penalidadeAtrasoPct?: number;
   @IsOptional() @IsBoolean() analiseAtiva?: boolean;
 }
 
