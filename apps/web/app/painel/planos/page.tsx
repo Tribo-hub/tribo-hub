@@ -279,9 +279,9 @@ export default function PlanosProdutorPage() {
         </div>
 
         <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-          {/* Lista + novo plano */}
-          <div className="space-y-4">
-            <section className="ui-card divide-y divide-slate-100 dark:divide-slate-700">
+          {/* Novo plano (topo) + lista (abaixo) */}
+          <div className="flex flex-col gap-4">
+            <section className="order-2 ui-card divide-y divide-slate-100 dark:divide-slate-700">
               {planos.length === 0 ? (
                 <p className="p-4 text-center text-slate-400 text-sm">Nenhum plano ainda.</p>
               ) : planos.map((p) => (
@@ -292,7 +292,7 @@ export default function PlanosProdutorPage() {
               ))}
             </section>
 
-            <form onSubmit={criarPlano} className="ui-card p-4 space-y-2">
+            <form onSubmit={criarPlano} className="order-1 ui-card p-4 space-y-2">
               <p className="font-semibold text-sm">Novo plano</p>
               <input placeholder="Título" value={novoPlano.titulo} onChange={(e) => setNovoPlano({ ...novoPlano, titulo: e.target.value })} className={inp} />
               <input placeholder="Subtítulo (ex: Ajuste de velas)" value={novoPlano.subtitulo} onChange={(e) => setNovoPlano({ ...novoPlano, subtitulo: e.target.value })} className={inp} />
