@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { api, setToken } from '../../lib/api';
+import { api, setSessao } from '../../lib/api';
 
 interface LoginResponse {
   accessToken: string;
+  refreshToken: string;
   usuario: { nome: string; role: string };
 }
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, senha }),
       });
-      setToken(res.accessToken);
+      setSessao(res.accessToken, res.refreshToken);
       router.push(destino(res.usuario.role));
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha no login');

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, setToken } from '../../lib/api';
+import { api, setSessao } from '../../lib/api';
 import { CopyButton } from '../../components/CopyButton';
 
 interface Plano {
@@ -81,8 +81,8 @@ export default function CriarContaPage() {
 
   async function entrar() {
     try {
-      const r = await api<{ accessToken: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ email: adminEmail, senha }) });
-      setToken(r.accessToken);
+      const r = await api<{ accessToken: string; refreshToken: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ email: adminEmail, senha }) });
+      setSessao(r.accessToken, r.refreshToken);
       router.push('/painel/dashboard');
     } catch { router.push('/login'); }
   }

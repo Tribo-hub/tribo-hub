@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { api, setToken } from '../../lib/api';
+import { api, setSessao } from '../../lib/api';
 
 interface SignupResponse {
   accessToken: string;
+  refreshToken: string;
   usuario: { role: string };
 }
 
@@ -32,7 +33,7 @@ export default function CadastroPage() {
         method: 'POST',
         body: JSON.stringify({ nome, email, senha, ...(tenant ? { tenant } : {}) }),
       });
-      setToken(res.accessToken);
+      setSessao(res.accessToken, res.refreshToken);
       router.push('/app');
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível criar a conta');
@@ -63,7 +64,7 @@ export default function CadastroPage() {
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             required
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
         </div>
         <div>
@@ -73,7 +74,7 @@ export default function CadastroPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
         </div>
         <div>
@@ -83,19 +84,19 @@ export default function CadastroPage() {
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             required
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
         </div>
         <div>
-          <label className="text-xs text-slate-500 dark:text-slate-400">Conta (subdomínio)</label>
+          <label className="text-xs text-slate-500 dark:text-slate-400">Código da sua conta</label>
           <input
             type="text"
             value={tenant}
             onChange={(e) => setTenant(e.target.value)}
             placeholder="ex.: academia-do-trafego"
-            className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+            className="w-full ui-input dark:text-white mt-1"
           />
-          <p className="text-[11px] text-slate-400 mt-1">Em produção, vem do endereço da área de membros.</p>
+          <p className="text-[11px] text-slate-400 mt-1">Informe o código da área de membros onde você vai estudar.</p>
         </div>
         <button
           type="submit"

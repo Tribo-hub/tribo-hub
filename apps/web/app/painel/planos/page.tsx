@@ -33,6 +33,12 @@ export default function PlanosProdutorPage() {
   const [aulasDoPlano, setAulasDoPlano] = useState<AulaOpt[]>([]);
   const [detAluno, setDetAluno] = useState<DetalheAluno | null>(null);
   const [analiseTexto, setAnaliseTexto] = useState('');
+  const [busy, setBusy] = useState(false); // trava anti-duplo-clique
+  const [confirmDlg, setConfirmDlg] = useState<{ msg: string; onOk: () => void } | null>(null);
+
+  function pedirConfirmacao(msg: string, onOk: () => void) {
+    setConfirmDlg({ msg, onOk });
+  }
 
   // edição das configurações do plano selecionado
   const [cfg, setCfg] = useState({ titulo: '', subtitulo: '', descricao: '', prazoEm: '', releasedAt: '', agendamento: 'fixo', liberaAposDias: '0', prazoDias: '', xpEntrega: '0', penalizarAtraso: false, penalidadeAtrasoPct: '20', analiseAtiva: false });
@@ -97,7 +103,8 @@ export default function PlanosProdutorPage() {
 
   async function criarPlano(e: React.FormEvent) {
     e.preventDefault();
-    if (!novoPlano.titulo.trim()) return;
+    if (!novoPlano.titulo.trim() || busy) return;
+    setBusy(true);
     try {
       const p = await api<{ id: string }>('/painel/planos', {
         method: 'POST',
@@ -129,11 +136,14 @@ export default function PlanosProdutorPage() {
       await abrir(p.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao criar plano');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function salvarCfg() {
-    if (!sel) return;
+    if (!sel || busy) return;
+    setBusy(true);
     try {
       await api(`/painel/planos/${sel.id}`, {
         method: 'PATCH',
@@ -163,6 +173,8 @@ export default function PlanosProdutorPage() {
       await abrir(sel.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar plano');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -180,17 +192,22 @@ export default function PlanosProdutorPage() {
     }
   }
 
-  async function removerPlano(id: string) {
-    if (!confirm('Remover este plano e todos os itens?')) return;
-    await api(`/painel/planos/${id}`, { method: 'DELETE' });
-    if (sel?.id === id) setSel(null);
-    await carregar();
+  function removerPlano(id: string) {
+    pedirConfirmacao('Remover este plano e todos os itens?', async () => {
+      try {
+        await api(`/painel/planos/${id}`, { method: 'DELETE' });
+        if (sel?.id === id) setSel(null);
+        toast.success('Plano removido.');
+        await carregar();
+      } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao remover'); }
+    });
   }
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!sel || !novoItem.titulo.trim()) return;
+    if (!sel || !novoItem.titulo.trim() || busy) return;
     if ((novoItem.tipo === 'assistir' || novoItem.tipo === 'resumo') && !novoItem.aulaId) { toast.error('Selecione a aula desta tarefa.'); return; }
+    setBusy(true);
     try {
       await api(`/painel/planos/${sel.id}/itens`, {
         method: 'POST',
@@ -206,18 +223,21 @@ export default function PlanosProdutorPage() {
       });
       setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
       await abrir(sel.id);
-      await carregar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao adicionar tarefa');
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function removerItem(itemId: string) {
+  function removerItem(itemId: string) {
     if (!sel) return;
-    if (!confirm('Remover esta tarefa do plano?')) return;
-    await api(`/painel/planos/itens/${itemId}`, { method: 'DELETE' });
-    await abrir(sel.id);
-    await carregar();
+    pedirConfirmacao('Remover esta tarefa do plano?', async () => {
+      try {
+        await api(`/painel/planos/itens/${itemId}`, { method: 'DELETE' });
+        await abrir(sel.id);
+      } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao remover'); }
+    });
   }
 
   // drag & drop reorder
@@ -308,7 +328,7 @@ export default function PlanosProdutorPage() {
                 <label className="text-xs text-slate-500 block">Redução (%)<input type="number" min={0} max={100} value={novoPlano.penalidadeAtrasoPct} onChange={(e) => setNovoPlano({ ...novoPlano, penalidadeAtrasoPct: e.target.value })} className={inp} /></label>
               )}
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={novoPlano.analiseAtiva} onChange={(e) => setNovoPlano({ ...novoPlano, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
-              <button className="w-full bg-tribo-600 hover:bg-tribo-700 text-white font-semibold py-2 rounded-lg text-sm">Criar plano</button>
+              <button disabled={busy} className="w-full bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold py-2 rounded-lg text-sm">{busy ? 'Salvando…' : 'Criar plano'}</button>
             </form>
           </div>
 
@@ -365,7 +385,7 @@ export default function PlanosProdutorPage() {
                     </div>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={cfg.penalizarAtraso} onChange={(e) => setCfg({ ...cfg, penalizarAtraso: e.target.checked })} /> Reduzir XP se entregar fora do prazo</label>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={cfg.analiseAtiva} onChange={(e) => setCfg({ ...cfg, analiseAtiva: e.target.checked })} /> Terá análise do mentor</label>
-                    <button onClick={salvarCfg} className="bg-tribo-600 hover:bg-tribo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Salvar plano</button>
+                    <button onClick={salvarCfg} disabled={busy} className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg">{busy ? 'Salvando…' : 'Salvar plano'}</button>
                   </div>
                 </div>
 
@@ -413,7 +433,7 @@ export default function PlanosProdutorPage() {
                       ) : (
                         <input type="date" value={novoItem.prazoEm} onChange={(e) => setNovoItem({ ...novoItem, prazoEm: e.target.value })} className={`${inp} w-40`} />
                       )}
-                      <button className="bg-slate-700 dark:bg-slate-600 text-white text-sm px-4 rounded-lg">+ Item</button>
+                      <button disabled={busy} className="bg-slate-700 dark:bg-slate-600 disabled:opacity-60 text-white text-sm px-4 rounded-lg">{busy ? '...' : '+ Item'}</button>
                     </div>
                   </form>
                 </div>
@@ -455,6 +475,19 @@ export default function PlanosProdutorPage() {
           )}
         </div>
       </div>
+
+      {/* Modal: confirmação (evita confirm() nativo, que trava sob automação) */}
+      {confirmDlg && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={() => setConfirmDlg(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-sm shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm text-slate-800 dark:text-slate-100">{confirmDlg.msg}</p>
+            <div className="mt-4 flex justify-end gap-3">
+              <button onClick={() => setConfirmDlg(null)} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-4 py-2">Cancelar</button>
+              <button onClick={() => { const fn = confirmDlg.onOk; setConfirmDlg(null); fn(); }} className="bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: detalhe do aluno */}
       {detAluno && (
