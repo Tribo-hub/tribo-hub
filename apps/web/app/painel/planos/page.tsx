@@ -35,6 +35,7 @@ export default function PlanosProdutorPage() {
   const [analiseTexto, setAnaliseTexto] = useState('');
   const [busy, setBusy] = useState(false); // trava anti-duplo-clique
   const [confirmDlg, setConfirmDlg] = useState<{ msg: string; onOk: () => void } | null>(null);
+  const [filtroTrilha, setFiltroTrilha] = useState(''); // '' = todas as trilhas
 
   function pedirConfirmacao(msg: string, onOk: () => void) {
     setConfirmDlg({ msg, onOk });
@@ -281,15 +282,44 @@ export default function PlanosProdutorPage() {
         <div className="grid lg:grid-cols-[300px_1fr] gap-6">
           {/* Novo plano (topo) + lista (abaixo) */}
           <div className="flex flex-col gap-4">
-            <section className="order-2 ui-card divide-y divide-slate-100 dark:divide-slate-700">
+            <section className="order-2 ui-card overflow-hidden">
               {planos.length === 0 ? (
                 <p className="p-4 text-center text-slate-400 text-sm">Nenhum plano ainda.</p>
-              ) : planos.map((p) => (
-                <button key={p.id} onClick={() => abrir(p.id)} className={`w-full text-left p-3 ${sel?.id === p.id ? 'bg-slate-50 dark:bg-slate-700/40' : ''}`}>
-                  <p className="font-medium text-sm">#{p.ordem} · {p.titulo}</p>
-                  <p className="text-xs text-slate-400">{p.totalItens} itens · {p.entregas} entrega(s) · {p.trilhaTitulo ?? 'todos os alunos'}</p>
-                </button>
-              ))}
+              ) : (() => {
+                // agrupa por trilha (null = "Todos os alunos"), preservando a ordem de chegada
+                const grupos = new Map<string, PlanoResumo[]>();
+                for (const p of planos) {
+                  const k = p.trilhaTitulo ?? 'Todos os alunos';
+                  if (!grupos.has(k)) grupos.set(k, []);
+                  grupos.get(k)!.push(p);
+                }
+                const entradas = [...grupos.entries()].filter(([k]) => !filtroTrilha || k === filtroTrilha);
+                return (
+                  <>
+                    {grupos.size > 1 && (
+                      <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+                        <select value={filtroTrilha} onChange={(e) => setFiltroTrilha(e.target.value)} className="w-full ui-input text-sm">
+                          <option value="">Todas as trilhas ({planos.length})</option>
+                          {[...grupos.entries()].map(([k, ps]) => <option key={k} value={k}>{k} ({ps.length})</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {entradas.map(([k, ps]) => (
+                      <div key={k}>
+                        <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-700/40 sticky top-0">{k} · {ps.length}</p>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                          {ps.map((p) => (
+                            <button key={p.id} onClick={() => abrir(p.id)} className={`w-full text-left p-3 ${sel?.id === p.id ? 'bg-slate-50 dark:bg-slate-700/40' : ''}`}>
+                              <p className="font-medium text-sm">#{p.ordem} · {p.titulo}</p>
+                              <p className="text-xs text-slate-400">{p.totalItens} itens · {p.entregas} entrega(s)</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             </section>
 
             <form onSubmit={criarPlano} className="order-1 ui-card p-4 space-y-2">
