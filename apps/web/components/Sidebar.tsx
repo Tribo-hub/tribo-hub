@@ -23,6 +23,7 @@ const INFO: Item[] = [
   { href: '/painel/planos', label: 'Planos de Ação', icon: ListChecks },
   { href: '/painel/agentes', label: 'Agentes IA', icon: Bot },
   { href: '/painel/marca', label: 'Marca', icon: Palette },
+  { href: '/painel/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/painel/recursos', label: 'Recursos', icon: Puzzle },
 ];
 const CORP: Item[] = [

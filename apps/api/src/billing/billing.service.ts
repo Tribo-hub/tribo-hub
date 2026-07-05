@@ -648,12 +648,28 @@ export class BillingService {
     return slug;
   }
 
-  // Fatura em aberto (pendente/vencida) da conta — usada na tela de "regularize" do produtor.
+  // Fatura em aberto (pendente/vencida) da conta — usada na tela de "regularize" e na Central de Assinatura.
   async faturaAbertaDaConta(contaId: string) {
     return this.prisma.faturaPlataforma.findFirst({
       where: { contaId, status: { in: [StatusFatura.pendente, StatusFatura.vencida] } },
       orderBy: { fechadaEm: 'desc' },
-      select: { id: true, competencia: true, valorTotal: true, status: true, vencimentoEm: true, pixCopiaECola: true },
+      select: {
+        id: true, competencia: true, valorTotal: true, status: true, vencimentoEm: true,
+        pixCopiaECola: true, boletoUrl: true, boletoLinhaDigitavel: true, metodoPagamento: true,
+      },
+    });
+  }
+
+  // Histórico de faturas da própria conta (Central de Assinatura do produtor/empresa).
+  async minhasFaturas(contaId: string) {
+    return this.prisma.faturaPlataforma.findMany({
+      where: { contaId },
+      orderBy: { fechadaEm: 'desc' },
+      take: 24,
+      select: {
+        id: true, competencia: true, valorTotal: true, status: true,
+        vencimentoEm: true, pagoEm: true, metodoPagamento: true, avulsa: true, observacao: true,
+      },
     });
   }
 

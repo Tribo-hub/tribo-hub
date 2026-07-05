@@ -270,6 +270,15 @@ export class BillingController {
     return this.billing.faturaAbertaDaConta(u.contaId!);
   }
 
+  // Histórico de faturas da própria conta (Central de Assinatura)
+  @Get('painel/minhas-faturas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.admin_tenant)
+  @PermitirInadimplente()
+  minhasFaturas(@CurrentUser() u: AuthUser) {
+    return this.billing.minhasFaturas(u.contaId!);
+  }
+
   // Validação do webhook: a Efí faz uma requisição na URL base ao registrar — precisa responder 2xx.
   @Get('webhooks/efi')
   @HttpCode(200)

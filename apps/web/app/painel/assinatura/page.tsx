@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
 import { Shell } from '../../../components/Shell';
+import { CopyButton } from '../../../components/CopyButton';
+import { Badge } from '../../../components/ui/Badge';
 import { toast } from '../../../lib/toast';
 
 const PAYEE = process.env.NEXT_PUBLIC_EFI_PAYEE_CODE || '062bc92084e2302eaa8463cf018ec2fe';
@@ -16,10 +18,24 @@ interface Assinatura {
   cartaoMascara: string | null;
   temCartao: boolean;
 }
+interface FaturaAberta {
+  id: string; competencia: string; valorTotal: string; status: string; vencimentoEm: string | null;
+  pixCopiaECola: string | null; boletoUrl: string | null; boletoLinhaDigitavel: string | null; metodoPagamento: string | null;
+}
+interface FaturaHist {
+  id: string; competencia: string; valorTotal: string; status: string;
+  vencimentoEm: string | null; pagoEm: string | null; metodoPagamento: string | null; avulsa: boolean; observacao: string | null;
+}
+
+const TOM_STATUS: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  paga: 'success', pendente: 'warning', vencida: 'danger', cancelada: 'neutral',
+};
 
 export default function AssinaturaPage() {
   const router = useRouter();
   const [info, setInfo] = useState<Assinatura | null>(null);
+  const [aberta, setAberta] = useState<FaturaAberta | null>(null);
+  const [faturas, setFaturas] = useState<FaturaHist[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -43,10 +59,13 @@ export default function AssinaturaPage() {
   const [estado, setEstado] = useState('');
   const [complemento, setComplemento] = useState('');
 
-  const carregar = () =>
+  const carregar = () => {
     api<Assinatura>('/painel/assinatura')
       .then(setInfo)
       .catch((err) => { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } });
+    api<FaturaAberta | null>('/painel/minha-fatura-aberta').then(setAberta).catch(() => {});
+    api<FaturaHist[]>('/painel/minhas-faturas').then(setFaturas).catch(() => {});
+  };
 
   useEffect(() => { if (!getToken()) { router.replace('/login'); return; } carregar(); }, [router]);
 
@@ -111,15 +130,74 @@ export default function AssinaturaPage() {
       <div className="p-6 max-w-2xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Assinatura</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Valor mensal: <b>R$ {info.valorBase.toFixed(2)}</b></p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Valor base mensal: <b>R$ {info.valorBase.toFixed(2)}</b>
+            {info.temCartao && info.cartaoMascara ? <> · cartão <span className="font-mono">{info.cartaoMascara}</span></> : null}
+          </p>
         </div>
 
-        {info.tipoConta !== 'corporativo' ? (
-          <div className="ui-card p-5 text-sm text-slate-500 dark:text-slate-400">
-            O cartão recorrente está disponível apenas para contas corporativas. Sua conta é cobrada por <b>Pix</b> ou <b>boleto</b> a cada ciclo.
-          </div>
-        ) : (
+        {/* Fatura em aberto (pagar proativamente) */}
+        <div className="ui-card p-5 space-y-3">
+          <h2 className="font-semibold">Fatura em aberto</h2>
+          {!aberta ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">✓ Nenhuma fatura em aberto. Tudo em dia!</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="font-medium">{aberta.competencia}</span>
+                <span className="font-bold">R$ {Number(aberta.valorTotal).toFixed(2)}</span>
+                <Badge tom={TOM_STATUS[aberta.status] ?? 'neutral'}>{aberta.status}</Badge>
+                {aberta.vencimentoEm && <span className="text-xs text-slate-400">vence {new Date(aberta.vencimentoEm).toLocaleDateString('pt-BR')}</span>}
+              </div>
+              {aberta.pixCopiaECola && (
+                <div className="text-sm bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                  <p className="text-xs text-slate-500 mb-1">Pix copia-e-cola:</p>
+                  <code className="block bg-white dark:bg-slate-800 border rounded p-2 break-all text-xs">{aberta.pixCopiaECola}</code>
+                  <div className="mt-2"><CopyButton texto={aberta.pixCopiaECola} label="Copiar Pix" /></div>
+                </div>
+              )}
+              {aberta.boletoUrl && (
+                <a href={aberta.boletoUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-tribo-600 dark:text-tribo-400 underline">Abrir boleto</a>
+              )}
+              {aberta.boletoLinhaDigitavel && (
+                <div className="text-sm bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                  <p className="text-xs text-slate-500 mb-1">Linha digitável:</p>
+                  <code className="block bg-white dark:bg-slate-800 border rounded p-2 break-all text-xs">{aberta.boletoLinhaDigitavel}</code>
+                  <div className="mt-2"><CopyButton texto={aberta.boletoLinhaDigitavel} label="Copiar código" /></div>
+                </div>
+              )}
+              {!aberta.pixCopiaECola && !aberta.boletoUrl && (
+                <p className="text-xs text-amber-600">A cobrança está sendo gerada — atualize em instantes ou aguarde o e-mail.</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Histórico de faturas */}
+        <div className="ui-card overflow-hidden">
+          <h2 className="font-semibold px-5 py-3 border-b border-slate-100 dark:border-slate-700">Histórico de faturas</h2>
+          <table className="w-full text-sm">
+            <thead className="text-left text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/40">
+              <tr><th className="px-4 py-2 font-medium">Competência</th><th className="px-4 py-2 font-medium">Valor</th><th className="px-4 py-2 font-medium">Status</th><th className="px-4 py-2 font-medium">Pago em</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {faturas.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">Nenhuma fatura ainda.</td></tr>
+              ) : faturas.map((f) => (
+                <tr key={f.id}>
+                  <td className="px-4 py-3">{f.competencia}{f.avulsa && <span className="text-xs text-slate-400"> · avulsa</span>}</td>
+                  <td className="px-4 py-3">R$ {Number(f.valorTotal).toFixed(2)}</td>
+                  <td className="px-4 py-3"><Badge tom={TOM_STATUS[f.status] ?? 'neutral'}>{f.status}</Badge></td>
+                  <td className="px-4 py-3 text-xs text-slate-400">{f.pagoEm ? new Date(f.pagoEm).toLocaleDateString('pt-BR') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {info.tipoConta === 'corporativo' && (
           <>
+            <h2 className="font-semibold">Cartão recorrente</h2>
             {info.temCartao && (
               <div className="ui-card p-4 text-sm border-l-4 border-emerald-500">
                 Cartão recorrente ativo {info.cartaoMascara ? <>· <span className="font-mono">{info.cartaoMascara}</span></> : null}. Você pode cadastrar outro cartão abaixo para substituir.
