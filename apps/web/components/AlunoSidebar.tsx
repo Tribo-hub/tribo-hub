@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  Home, CalendarDays, ListChecks, Trophy, Bot, Award,
+  Home, GraduationCap, CalendarDays, ListChecks, Trophy, Bot, Award,
   Sun, Moon, LogOut, ChevronLeft, ChevronRight, KeyRound, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
@@ -72,6 +72,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
 
   const itens: Item[] = [
     { href: '/app', label: 'Início', icon: Home, exact: true },
+    { href: '/app/cursos', label: 'Meus cursos', icon: GraduationCap },
     ...(me?.conta?.agendaAtiva ? [{ href: '/app/agenda', label: 'Agenda', icon: CalendarDays }] : []),
     ...(me?.conta?.planosAtivos ? [{ href: '/app/planos', label: 'Planos', icon: ListChecks }] : []),
     ...(me?.conta?.gamificacaoAtiva ? [{ href: '/app/conquistas', label: 'Conquistas', icon: Trophy }] : []),
