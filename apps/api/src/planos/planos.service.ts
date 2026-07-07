@@ -329,6 +329,7 @@ export class PlanosService {
           titulo: p.titulo,
           subtitulo: p.subtitulo,
           ordem: p.ordem,
+          trilhaId: p.trilhaId,
           capaUrl: await this.assinarSeArquivo(p.capaUrl),
           prazoEm,
           releasedAt,

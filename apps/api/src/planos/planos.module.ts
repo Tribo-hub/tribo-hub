@@ -8,5 +8,6 @@ import { PlanosService } from './planos.service';
   imports: [GamificacaoModule, StorageModule],
   controllers: [PlanosPainelController, PlanosAppController],
   providers: [PlanosService],
+  exports: [PlanosService],
 })
 export class PlanosModule {}

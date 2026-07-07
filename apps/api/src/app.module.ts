@@ -16,6 +16,7 @@ import { ConteudoModule } from './conteudo/conteudo.module';
 import { CorporativoModule } from './corporativo/corporativo.module';
 import { EmailModule } from './email/email.module';
 import { EquipeModule } from './equipe/equipe.module';
+import { JornadaModule } from './jornada/jornada.module';
 import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
@@ -45,6 +46,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     PlanosModule,
     GamificacaoModule,
     EquipeModule,
+    JornadaModule,
   ],
   controllers: [HealthController],
   providers: [
