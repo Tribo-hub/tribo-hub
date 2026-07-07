@@ -79,13 +79,13 @@ export default function PlanosAlunoPage() {
         ) : planos.length === 0 ? (
           <p className="text-slate-500 text-sm">Nenhum plano de ação disponível no momento.</p>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {planos.map((p) => {
               const cd = countdown(p);
               const concluido = p.entregue;
               const Card = (
                 <div className={`ui-card overflow-hidden h-full flex flex-col ${p.bloqueado ? 'opacity-80' : 'hover:shadow-md transition'}`}>
-                  <div className="relative w-3/5 mx-auto">
+                  <div className="relative">
                     {p.capaUrl ? (
                       <img src={p.capaUrl} alt={p.titulo} className="aspect-[2/3] w-full object-cover" />
                     ) : (
