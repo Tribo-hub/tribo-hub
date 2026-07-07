@@ -20,7 +20,7 @@ interface Me { conta?: { corPrimaria: string | null } }
 
 const DIA = 86_400_000;
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString('pt-BR') : '');
-const TIPO_ICON: Record<TipoItem, string> = { check: '☑️', assistir: '▶️', resumo: '📝', link: '🔗' };
+const TIPO_ICON: Record<TipoItem, string> = { check: '', assistir: '▶️', resumo: '📝', link: '🔗' };
 
 // Converte texto com URLs em nós com links clicáveis (descrição = texto + links).
 function comLinks(txt: string) {
@@ -160,7 +160,7 @@ export default function PlanoDetalhePage() {
               <button key={it.id} onClick={() => abrirItem(it)} className="w-full text-left ui-card p-3 flex items-center gap-3 hover:shadow-md transition">
                 <span className={`shrink-0 w-7 h-7 rounded-full grid place-items-center text-sm ${it.concluido ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>{it.concluido ? '✓' : i + 1}</span>
                 <span className="flex-1 min-w-0">
-                  <span className="text-sm font-medium block truncate">{TIPO_ICON[it.tipo]} {it.titulo}</span>
+                  <span className="text-sm font-medium block truncate">{TIPO_ICON[it.tipo] ? TIPO_ICON[it.tipo] + ' ' : ''}{it.titulo}</span>
                   {it.descricao && <span className="text-xs text-slate-400 block truncate">{it.descricao}</span>}
                 </span>
                 {it.prazoEm && <span className={`text-xs shrink-0 ${atrasado ? 'text-rose-500 font-medium' : 'text-slate-400'}`}>{fmt(it.prazoEm)}</span>}
@@ -193,7 +193,7 @@ export default function PlanoDetalhePage() {
           <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-lg max-h-[88vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold text-slate-800 dark:text-slate-100">{TIPO_ICON[aberto.tipo]} {aberto.titulo}</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-100">{TIPO_ICON[aberto.tipo] ? TIPO_ICON[aberto.tipo] + ' ' : ''}{aberto.titulo}</p>
                 <p className="text-xs mt-0.5">
                   <span className={`px-2 py-0.5 rounded-full ${aberto.concluido ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700'}`}>{aberto.concluido ? 'Concluído' : 'Pendente'}</span>
                   {aberto.prazoEm && <span className="text-slate-400 ml-2">Prazo: {fmt(aberto.prazoEm)}</span>}

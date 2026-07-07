@@ -255,8 +255,10 @@ export class AlunoService {
     // valida acesso à trilha da aula
     await this.trilhaAcessivel(user, aula.modulo.trilhaId);
 
+    // Desmarcar é explícito (concluido === false); senão, marca por flag ou por % assistido.
+    const desmarcando = dto.concluido === false;
     const concluido =
-      dto.concluido === true || (dto.percentualAssistido ?? 0) >= PERCENT_CONCLUSAO;
+      !desmarcando && (dto.concluido === true || (dto.percentualAssistido ?? 0) >= PERCENT_CONCLUSAO);
 
     await this.prisma.progresso.upsert({
       where: { usuarioId_aulaId: { usuarioId: user.sub, aulaId: dto.aulaId } },
@@ -270,31 +272,40 @@ export class AlunoService {
       },
       update: {
         percentualAssistido: dto.percentualAssistido,
-        concluido: concluido ? true : undefined,
-        concluidoEm: concluido ? new Date() : undefined,
+        concluido,
+        concluidoEm: concluido ? new Date() : null,
       },
+    });
+
+    // Tarefas de Plano de Ação do tipo "assistir" vinculadas a esta aula (para pontuar/despontuar junto).
+    const mats = await this.prisma.matricula.findMany({
+      where: { usuarioId: user.sub, contaId: user.contaId!, status: StatusMatricula.ativa },
+      select: { trilhaId: true },
+    });
+    const minhas = mats.map((m) => m.trilhaId);
+    const itensAssistir = await this.prisma.planoItem.findMany({
+      where: {
+        aulaId: dto.aulaId,
+        tipo: PlanoItemTipo.assistir,
+        plano: { contaId: user.contaId!, OR: [{ trilhaId: null }, { trilhaId: { in: minhas } }] },
+      },
+      select: { id: true },
     });
 
     if (concluido) {
       await this.gamificacao.registrar(user, 'aula', dto.aulaId);
-      // Tarefas de Plano de Ação do tipo "assistir" vinculadas a esta aula concluem junto (pontuam).
-      const mats = await this.prisma.matricula.findMany({
-        where: { usuarioId: user.sub, contaId: user.contaId!, status: StatusMatricula.ativa },
-        select: { trilhaId: true },
-      });
-      const minhas = mats.map((m) => m.trilhaId);
-      const itensAssistir = await this.prisma.planoItem.findMany({
-        where: {
-          aulaId: dto.aulaId,
-          tipo: PlanoItemTipo.assistir,
-          plano: { contaId: user.contaId!, OR: [{ trilhaId: null }, { trilhaId: { in: minhas } }] },
-        },
-        select: { id: true },
-      });
       for (const it of itensAssistir) await this.gamificacao.registrar(user, 'plano_item', it.id);
+    } else if (desmarcando) {
+      // Ao desmarcar, remove o XP da aula e das tarefas "assistir" vinculadas.
+      await this.prisma.xpEvento.deleteMany({ where: { usuarioId: user.sub, tipo: 'aula', refId: dto.aulaId } });
+      if (itensAssistir.length) {
+        await this.prisma.xpEvento.deleteMany({
+          where: { usuarioId: user.sub, tipo: 'plano_item', refId: { in: itensAssistir.map((i) => i.id) } },
+        });
+      }
     }
 
-    const certificado = await this.verificarConclusaoTrilha(user, aula.modulo.trilhaId);
+    const certificado = concluido ? await this.verificarConclusaoTrilha(user, aula.modulo.trilhaId) : null;
     return { ok: true, concluido, certificadoEmitido: !!certificado };
   }
 
