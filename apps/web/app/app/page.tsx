@@ -186,6 +186,30 @@ export default function AppHome() {
 
                   {vista === 'foco' ? (
                     /* ===== V2: MISSÃO EM FOCO ===== */
+                    <>
+                    {/* Régua da jornada (com cadeados) */}
+                    <div className="ui-card p-4 mt-4 overflow-x-auto">
+                      <div className="relative flex gap-2 min-w-max px-3">
+                        <div className="absolute left-8 right-8 top-[14px] h-0.5 bg-slate-200 dark:bg-slate-700" />
+                        {jornada.planos.map((p) => {
+                          const atual = jornada.atual?.id === p.id;
+                          const bg = p.entregue ? '#10a566' : atual ? cor : undefined;
+                          const node = (
+                            <div className="relative z-10 flex flex-col items-center shrink-0" style={{ width: 88 }} title={p.bloqueado ? `abre ${fmt(p.releasedAt)}` : p.titulo}>
+                              <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600"
+                                style={bg ? { backgroundColor: bg, color: '#fff', borderColor: bg } : undefined}>
+                                {p.entregue ? '✓' : p.bloqueado ? '🔒' : p.ordem}
+                              </span>
+                              <span className={`text-[10px] mt-1 leading-tight text-center truncate w-full ${atual ? 'font-bold' : 'text-slate-400'}`} style={atual ? { color: cor } : undefined}>{p.titulo}</span>
+                            </div>
+                          );
+                          return p.bloqueado
+                            ? <div key={p.id}>{node}</div>
+                            : <Link key={p.id} href={`/app/planos/ver?id=${p.id}`} className="hover:opacity-80">{node}</Link>;
+                        })}
+                      </div>
+                    </div>
+
                     <div className="mt-4 grid lg:grid-cols-[1.5fr_1fr] gap-4">
                       {jornada.atual ? (
                         <div className="ui-card p-6" style={{ borderColor: `color-mix(in srgb, ${cor} 40%, transparent)` }}>
@@ -225,6 +249,7 @@ export default function AppHome() {
                         )}
                       </div>
                     </div>
+                    </>
                   ) : (
                     /* ===== V1: LINHA DO TEMPO ===== */
                     <div className="mt-4 relative pl-9">
