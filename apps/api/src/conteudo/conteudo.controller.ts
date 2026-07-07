@@ -43,6 +43,11 @@ export class ConteudoController {
     return this.conteudo.listarTrilhas(u);
   }
 
+  @Post('trilhas/reordenar')
+  reordenarTrilhas(@CurrentUser() u: AuthUser, @Body('ids') ids: string[]) {
+    return this.conteudo.reordenarTrilhas(u, ids);
+  }
+
   @Get('trilhas/:id')
   obterTrilha(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.conteudo.obterTrilha(u, id);

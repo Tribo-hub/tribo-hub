@@ -50,7 +50,7 @@ export class AlunoService {
     const where = await this.filtroAcesso(user);
     const trilhas = await this.prisma.trilha.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ ordem: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],
       include: { _count: { select: { modulos: true } } },
     });
 

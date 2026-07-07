@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { ChevronUp, ChevronDown, Pencil } from 'lucide-react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
 import { Shell } from '../../../components/Shell';
 
@@ -22,6 +23,8 @@ export default function CatalogoPage() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [form, setForm] = useState({ titulo: '', descricao: '', categoria: 'vendas' });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitulo, setEditTitulo] = useState('');
 
   const carregar = useCallback(async () => {
     try {
@@ -59,6 +62,30 @@ export default function CatalogoPage() {
     }
   }
 
+  async function mover(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= trilhas.length) return;
+    const arr = [...trilhas];
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    setTrilhas(arr);
+    try {
+      await api('/painel/trilhas/reordenar', { method: 'POST', body: JSON.stringify({ ids: arr.map((t) => t.id) }) });
+    } catch {
+      await carregar();
+    }
+  }
+
+  async function salvarTitulo(id: string) {
+    if (!editTitulo.trim()) return;
+    try {
+      await api(`/painel/trilhas/${id}`, { method: 'PATCH', body: JSON.stringify({ titulo: editTitulo.trim() }) });
+      setEditId(null);
+      await carregar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro ao salvar título');
+    }
+  }
+
   return (
     <Shell area="admin">
       <div className="p-6 grid lg:grid-cols-[1fr_320px] gap-6">
@@ -74,32 +101,38 @@ export default function CatalogoPage() {
             <p className="text-slate-500 text-sm">Nenhuma trilha no catálogo ainda. Crie a primeira ao lado →</p>
           ) : (
             <div className="space-y-2">
-              {trilhas.map((t) => (
-                <Link
-                  key={t.id}
-                  href={`/admin/conteudo/editar?id=${t.id}`}
-                  className="block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-3 hover:shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{t.titulo}</p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        t.publicado
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {t.publicado ? 'publicado' : 'rascunho'}
-                    </span>
+              <p className="text-xs text-slate-400">Use ▲▼ para definir a ordem que os alunos veem. ✏️ edita o título.</p>
+              {trilhas.map((t, i) => (
+                <div key={t.id} className="ui-card px-3 py-3 flex items-center gap-2">
+                  <div className="flex flex-col text-slate-400 shrink-0">
+                    <button onClick={() => mover(i, -1)} disabled={i === 0} title="Subir" className="disabled:opacity-25 hover:text-tribo-600 leading-none"><ChevronUp size={16} /></button>
+                    <button onClick={() => mover(i, 1)} disabled={i === trilhas.length - 1} title="Descer" className="disabled:opacity-25 hover:text-tribo-600 leading-none"><ChevronDown size={16} /></button>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{t.categoria}</p>
-                </Link>
+                  {editId === t.id ? (
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <input autoFocus value={editTitulo} onChange={(e) => setEditTitulo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && salvarTitulo(t.id)} className="flex-1 ui-input text-sm" />
+                      <button onClick={() => salvarTitulo(t.id)} className="text-xs bg-tribo-600 hover:bg-tribo-700 text-white font-semibold px-3 py-1.5 rounded-lg">Salvar</button>
+                      <button onClick={() => setEditId(null)} className="text-xs text-slate-500">cancelar</button>
+                    </div>
+                  ) : (
+                    <>
+                      <Link href={`/admin/conteudo/editar?id=${t.id}`} className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{t.titulo}</p>
+                        <p className="text-xs text-slate-500">{t.categoria}</p>
+                      </Link>
+                      <button onClick={() => { setEditId(t.id); setEditTitulo(t.titulo); }} title="Editar título" className="text-slate-400 hover:text-tribo-600 shrink-0"><Pencil size={15} /></button>
+                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${t.publicado ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                        {t.publicado ? 'publicado' : 'rascunho'}
+                      </span>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
           )}
         </section>
 
-        <aside className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 h-fit">
+        <aside className="ui-card p-5 h-fit">
           <h2 className="font-semibold mb-3">Nova trilha (catálogo)</h2>
           <form onSubmit={criar} className="space-y-3">
             <input
@@ -107,7 +140,7 @@ export default function CatalogoPage() {
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
               required
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <textarea
               placeholder="Descrição"
@@ -115,12 +148,12 @@ export default function CatalogoPage() {
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
               required
               rows={3}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <select
               value={form.categoria}
               onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             >
               {CATEGORIAS.map((c) => (
                 <option key={c} value={c}>

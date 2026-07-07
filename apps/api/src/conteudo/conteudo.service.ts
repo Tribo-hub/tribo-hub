@@ -44,8 +44,21 @@ export class ConteudoService {
   listarTrilhas(user: AuthUser) {
     return this.prisma.trilha.findMany({
       where: { deletedAt: null, ...this.escopo(user) },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ ordem: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],
     });
+  }
+
+  // Reordena as trilhas do usuário (define o campo `ordem` = posição na lista).
+  async reordenarTrilhas(user: AuthUser, ids: string[]) {
+    const donas = await this.prisma.trilha.findMany({
+      where: { deletedAt: null, ...this.escopo(user) },
+      select: { id: true },
+    });
+    const validos = new Set(donas.map((t) => t.id));
+    await this.prisma.$transaction(
+      ids.filter((id) => validos.has(id)).map((id, idx) => this.prisma.trilha.update({ where: { id }, data: { ordem: idx + 1 } })),
+    );
+    return { ok: true };
   }
 
   async obterTrilha(user: AuthUser, id: string) {
