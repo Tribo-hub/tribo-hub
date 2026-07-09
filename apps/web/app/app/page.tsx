@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../lib/api';
 import { sanitizeHtml } from '../../lib/sanitize';
 
@@ -15,6 +15,8 @@ interface PlanoJ { id: string; ordem: number; titulo: string; subtitulo: string 
 interface ItemAtual { id: string; titulo: string; tipo: string; concluido: boolean; aulaId: string | null; aulaTrilhaId: string | null }
 interface Atual { id: string; titulo: string; subtitulo: string | null; prazoEm: string | null; totalItens: number; concluidos: number; percentual: number; itens: ItemAtual[] }
 interface ProximoPasso { label: string; kind: 'aula' | 'plano'; aulaId?: string; trilhaId?: string; planoId: string }
+interface DetItem { id: string; titulo: string; tipo: string; concluido: boolean; aula: { id: string; trilhaId: string } | null }
+interface DetPlano { id: string; titulo: string; subtitulo: string | null; prazoEm: string | null; bloqueado: boolean; percentual: number; concluidos: number; totalItens: number; itens: DetItem[] }
 interface Live { titulo: string; inicioEm: string; linkAcesso: string }
 interface Jornada {
   opcoes: Opcao[]; sel: string; temPlanos: boolean; nivel: number | null; xp: number | null;
@@ -37,6 +39,12 @@ export default function AppHome() {
     if (typeof window === 'undefined') return 'foco';
     return (localStorage.getItem('tribo_jornada_vista') as 'foco' | 'linha') || 'foco';
   });
+  // Missão em foco: etapa selecionada (navegável) + detalhe com tarefas
+  const [selId, setSelId] = useState<string>('');
+  const [selDet, setSelDet] = useState<DetPlano | null>(null);
+  const [carregandoDet, setCarregandoDet] = useState(false);
+  const [marcando, setMarcando] = useState<string | null>(null);
+  const reguaRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -68,12 +76,67 @@ export default function AppHome() {
     try { localStorage.setItem('tribo_jornada_vista', v); } catch { /* ignore */ }
   }
 
+  // Seleção inicial = etapa atual; preserva a seleção entre recargas se ainda existir.
+  useEffect(() => {
+    if (!jornada?.temPlanos) return;
+    setSelId((prev) =>
+      prev && jornada.planos.some((p) => p.id === prev)
+        ? prev
+        : jornada.atual?.id ?? jornada.planos.find((p) => !p.bloqueado)?.id ?? jornada.planos[0]?.id ?? '',
+    );
+  }, [jornada]);
+
+  // Carrega o detalhe (tarefas) da etapa selecionada — se não estiver bloqueada.
+  useEffect(() => {
+    if (!selId) { setSelDet(null); return; }
+    const p = jornada?.planos.find((x) => x.id === selId);
+    if (!p || p.bloqueado) { setSelDet(null); return; }
+    let cancel = false;
+    setCarregandoDet(true);
+    api<DetPlano>(`/app/planos/${selId}`)
+      .then((d) => { if (!cancel) setSelDet(d); })
+      .catch(() => { if (!cancel) setSelDet(null); })
+      .finally(() => { if (!cancel) setCarregandoDet(false); });
+    return () => { cancel = true; };
+  }, [selId, jornada]);
+
+  // Mantém a etapa selecionada visível na régua.
+  useEffect(() => {
+    reguaRef.current?.querySelector(`[data-pid="${selId}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selId]);
+
+  function irPara(delta: number) {
+    if (!jornada) return;
+    const idx = jornada.planos.findIndex((p) => p.id === selId);
+    const novo = idx + delta;
+    if (novo < 0 || novo >= jornada.planos.length) return;
+    setSelId(jornada.planos[novo].id);
+  }
+
+  // Marca/desmarca tarefa do tipo "check" na própria home.
+  async function marcarItem(it: DetItem) {
+    if (!selId || marcando) return;
+    setMarcando(it.id);
+    try {
+      await api(`/app/planos/itens/${it.id}`, { method: 'PATCH', body: JSON.stringify({ concluido: !it.concluido }) });
+      const [d, jor] = await Promise.all([
+        api<DetPlano>(`/app/planos/${selId}`),
+        api<Jornada>(`/app/jornada?sel=${jornada?.sel ?? ''}`).catch(() => null),
+      ]);
+      setSelDet(d);
+      if (jor) setJornada(jor);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro ao marcar tarefa');
+    } finally {
+      setMarcando(null);
+    }
+  }
+
   const cor = me?.conta?.corPrimaria || '#7c3aed';
   const temJornada = !!jornada && jornada.opcoes.some((o) => o.temPlanos);
 
   // hrefs (cliques direcionados)
   const passoHref = (pp: ProximoPasso) => (pp.kind === 'aula' ? `/app/player?id=${pp.trilhaId}&aula=${pp.aulaId}` : `/app/planos/ver?id=${pp.planoId}`);
-  const itemHref = (it: ItemAtual, planoId: string) => (it.aulaId ? `/app/player?id=${it.aulaTrilhaId}&aula=${it.aulaId}` : `/app/planos/ver?id=${planoId}`);
   const pillCls = (s: string) =>
     s === 'entregue' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
     : s === 'atrasado' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
@@ -187,54 +250,94 @@ export default function AppHome() {
                   {vista === 'foco' ? (
                     /* ===== V2: MISSÃO EM FOCO ===== */
                     <>
-                    {/* Régua da jornada (com cadeados) */}
-                    <div className="ui-card p-4 mt-4 overflow-x-auto">
-                      <div className="relative flex gap-2 min-w-max px-3">
-                        <div className="absolute left-8 right-8 top-[14px] h-0.5 bg-slate-200 dark:bg-slate-700" />
-                        {jornada.planos.map((p) => {
-                          const atual = jornada.atual?.id === p.id;
-                          const bg = p.entregue ? '#10a566' : atual ? cor : undefined;
-                          const node = (
-                            <div className="relative z-10 flex flex-col items-center shrink-0" style={{ width: 88 }} title={p.bloqueado ? `abre ${fmt(p.releasedAt)}` : p.titulo}>
-                              <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600"
-                                style={bg ? { backgroundColor: bg, color: '#fff', borderColor: bg } : undefined}>
-                                {p.entregue ? '✓' : p.bloqueado ? '🔒' : p.ordem}
-                              </span>
-                              <span className={`text-[10px] mt-1 leading-tight text-center truncate w-full ${atual ? 'font-bold' : 'text-slate-400'}`} style={atual ? { color: cor } : undefined}>{p.titulo}</span>
-                            </div>
-                          );
-                          return p.bloqueado
-                            ? <div key={p.id}>{node}</div>
-                            : <Link key={p.id} href={`/app/planos/ver?id=${p.id}`} className="hover:opacity-80">{node}</Link>;
-                        })}
+                    {/* Régua da jornada — selecionável, com rolagem */}
+                    <div className="ui-card p-4 mt-4">
+                      <div ref={reguaRef} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
+                        <div className="relative flex gap-2 min-w-max px-3">
+                          <div className="absolute left-8 right-8 top-[14px] h-0.5 bg-slate-200 dark:bg-slate-700" />
+                          {jornada.planos.map((p) => {
+                            const selecionado = p.id === selId;
+                            const bg = p.entregue ? '#10a566' : selecionado ? cor : undefined;
+                            return (
+                              <button key={p.id} data-pid={p.id} onClick={() => setSelId(p.id)} title={p.bloqueado ? `abre ${fmt(p.releasedAt)}` : p.titulo}
+                                className="relative z-10 flex flex-col items-center shrink-0" style={{ width: 88 }}>
+                                <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600"
+                                  style={bg ? { backgroundColor: bg, color: '#fff', borderColor: bg } : (selecionado ? { boxShadow: `0 0 0 3px color-mix(in srgb, ${cor} 30%, transparent)`, borderColor: cor } : undefined)}>
+                                  {p.entregue ? '✓' : p.bloqueado ? '🔒' : p.ordem}
+                                </span>
+                                <span className={`text-[10px] mt-1 leading-tight text-center truncate w-full ${selecionado ? 'font-bold' : 'text-slate-400'}`} style={selecionado ? { color: cor } : undefined}>{p.titulo}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
                     <div className="mt-4 grid lg:grid-cols-[1.5fr_1fr] gap-4">
-                      {jornada.atual ? (
-                        <div className="ui-card p-6" style={{ borderColor: `color-mix(in srgb, ${cor} 40%, transparent)` }}>
-                          <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: cor }}>Sua missão agora</p>
-                          <h2 className="text-2xl font-bold tracking-tight mt-1">{jornada.atual.titulo}</h2>
-                          {jornada.atual.subtitulo && <p className="text-sm text-slate-500 dark:text-slate-400">{jornada.atual.subtitulo}</p>}
-                          <div className="my-4 flex items-center gap-4">
-                            <div className="w-[70px] h-[70px] rounded-full grid place-items-center shrink-0" style={{ background: `conic-gradient(${cor} ${jornada.atual.percentual}%, color-mix(in srgb, ${cor} 15%, transparent) 0)` }}>
-                              <div className="w-[54px] h-[54px] rounded-full bg-white dark:bg-slate-800 grid place-items-center text-sm font-extrabold">{jornada.atual.concluidos}/{jornada.atual.totalItens}</div>
+                      {(() => {
+                        const sp = jornada.planos.find((p) => p.id === selId);
+                        const idxSel = jornada.planos.findIndex((p) => p.id === selId);
+                        const ehAtual = jornada.atual?.id === selId;
+                        if (!sp) return <div className="ui-card p-6 text-sm text-slate-500">Selecione uma etapa.</div>;
+                        const atrasado = sp.status === 'atrasado' && !sp.entregue;
+                        const eyebrow = sp.entregue ? 'Etapa concluída' : ehAtual ? 'Sua missão agora' : sp.bloqueado ? 'Etapa bloqueada' : 'Etapa';
+                        return (
+                          <div className="ui-card p-6" style={ehAtual ? { borderColor: `color-mix(in srgb, ${cor} 40%, transparent)` } : undefined}>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: atrasado ? '#e11d48' : cor }}>{eyebrow}</p>
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => irPara(-1)} disabled={idxSel <= 0} aria-label="Etapa anterior" className="w-7 h-7 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-30 grid place-items-center hover:bg-slate-50 dark:hover:bg-slate-700">‹</button>
+                                <span className="text-xs text-slate-400 tabular-nums">{idxSel + 1}/{jornada.planos.length}</span>
+                                <button onClick={() => irPara(1)} disabled={idxSel >= jornada.planos.length - 1} aria-label="Próxima etapa" className="w-7 h-7 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-30 grid place-items-center hover:bg-slate-50 dark:hover:bg-slate-700">›</button>
+                              </div>
                             </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{jornada.atual.percentual}% das tarefas concluídas</p>
+                            <h2 className="text-2xl font-bold tracking-tight mt-1">{sp.titulo}</h2>
+                            {sp.subtitulo && <p className="text-sm text-slate-500 dark:text-slate-400">{sp.subtitulo}</p>}
+
+                            {atrasado && (
+                              <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
+                                ⚠️ Você está atrasado nesta etapa{sp.prazoEm ? ` (venceu ${fmt(sp.prazoEm)})` : ''} — conclua para avançar.
+                              </div>
+                            )}
+
+                            {sp.bloqueado ? (
+                              <div className="mt-4 text-sm text-slate-500 dark:text-slate-400">🔒 Esta etapa abre em <b>{fmt(sp.releasedAt)}</b>. Siga a etapa atual até lá.</div>
+                            ) : (
+                              <>
+                                <div className="my-4 flex items-center gap-4">
+                                  <div className="w-[70px] h-[70px] rounded-full grid place-items-center shrink-0" style={{ background: `conic-gradient(${cor} ${sp.percentual}%, color-mix(in srgb, ${cor} 15%, transparent) 0)` }}>
+                                    <div className="w-[54px] h-[54px] rounded-full bg-white dark:bg-slate-800 grid place-items-center text-sm font-extrabold">{sp.concluidos}/{sp.totalItens}</div>
+                                  </div>
+                                  <p className="text-sm text-slate-500 dark:text-slate-400">{sp.percentual}% das tarefas concluídas{sp.prazoEm && !sp.entregue ? ` · vence ${fmt(sp.prazoEm)}` : ''}</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                  {carregandoDet && !selDet ? (
+                                    <p className="text-sm text-slate-400 px-2">Carregando tarefas…</p>
+                                  ) : (selDet?.itens ?? []).map((it) => {
+                                    const podeMarcar = it.tipo === 'check' && !sp.entregue;
+                                    const check = <span className={`w-5 h-5 rounded grid place-items-center text-[11px] shrink-0 ${it.concluido ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300 dark:border-slate-600'}`}>{it.concluido ? '✓' : ''}</span>;
+                                    if (podeMarcar) {
+                                      return (
+                                        <button key={it.id} onClick={() => marcarItem(it)} disabled={marcando === it.id} className="w-full text-left flex items-center gap-2.5 text-sm rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-60">
+                                          {check}<span className={it.concluido ? 'line-through text-slate-400' : ''}>{it.titulo}</span>
+                                        </button>
+                                      );
+                                    }
+                                    const href = it.aula ? `/app/player?id=${it.aula.trilhaId}&aula=${it.aula.id}` : `/app/planos/ver?id=${sp.id}`;
+                                    return (
+                                      <Link key={it.id} href={href} className="flex items-center gap-2.5 text-sm rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                                        {check}<span className={it.concluido ? 'line-through text-slate-400' : ''}>{it.titulo}</span>
+                                        <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-400">{it.tipo === 'assistir' || it.tipo === 'resumo' ? 'aula' : it.tipo === 'link' ? 'link' : ''}</span>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                                <Link href={`/app/planos/ver?id=${sp.id}`} className="inline-block mt-4 text-white text-sm font-semibold px-5 py-2.5 rounded-lg" style={{ backgroundColor: cor }}>Abrir o plano →</Link>
+                              </>
+                            )}
                           </div>
-                          <div className="space-y-1.5">
-                            {jornada.atual.itens.map((it) => (
-                              <Link key={it.id} href={itemHref(it, jornada.atual!.id)} className={`flex items-center gap-2.5 text-sm rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/40 ${it.concluido ? 'text-slate-400' : ''}`}>
-                                <span className={`w-4 h-4 rounded grid place-items-center text-[10px] shrink-0 ${it.concluido ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300 dark:border-slate-600'}`}>{it.concluido ? '✓' : ''}</span>
-                                <span className={it.concluido ? 'line-through' : ''}>{it.titulo}</span>
-                              </Link>
-                            ))}
-                          </div>
-                          <Link href={`/app/planos/ver?id=${jornada.atual.id}`} className="inline-block mt-4 text-white text-sm font-semibold px-5 py-2.5 rounded-lg" style={{ backgroundColor: cor }}>Abrir o plano →</Link>
-                        </div>
-                      ) : (
-                        <div className="ui-card p-6 text-sm text-slate-500">Você concluiu todas as etapas disponíveis. 🎉</div>
-                      )}
+                        );
+                      })()}
                       <div className="space-y-4">
                         <div className="ui-card p-5">
                           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Você não está sozinho</p>
