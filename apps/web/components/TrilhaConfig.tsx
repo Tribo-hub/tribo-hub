@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api, uploadArquivo, urlAssinada } from '../lib/api';
+import { comprimirImagem } from '../lib/imagem';
 import { RichTextField } from './RichTextField';
 
 const DESC_MAX = 600;
@@ -98,9 +99,10 @@ export function TrilhaConfig({ trilha, onSaved }: { trilha: TrilhaCfg; onSaved: 
     if (!file) return;
     setEnviando(true);
     try {
-      const path = await uploadArquivo('capas', file);
+      const arq = await comprimirImagem(file);
+      const path = await uploadArquivo('capas', arq);
       setCapaPath(path);
-      setPreview(URL.createObjectURL(file));
+      setPreview(URL.createObjectURL(arq));
     } catch {
       alert('Falha ao enviar a capa.');
     } finally {

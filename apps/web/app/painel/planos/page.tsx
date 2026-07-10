@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, clearToken, getToken, uploadArquivo, urlAssinada } from '../../../lib/api';
+import { comprimirImagem } from '../../../lib/imagem';
 import { Shell } from '../../../components/Shell';
 import { toast } from '../../../lib/toast';
 
@@ -46,8 +47,10 @@ export default function PlanosProdutorPage() {
   const [capaPreview, setCapaPreview] = useState<string | null>(null);
   const [capaPath, setCapaPath] = useState<string | null>(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
+  const [acompCarregando, setAcompCarregando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragId = useRef<string | null>(null);
+  const trilhaCache = useRef<Map<string, TrilhaDetalhe>>(new Map());
 
   const carregar = useCallback(async () => {
     try {
@@ -69,8 +72,9 @@ export default function PlanosProdutorPage() {
   const onlyDate = (d: string | null) => (d ? d.slice(0, 10) : '');
 
   async function abrir(id: string) {
+    // 1) Detalhe leve (plano + tarefas) — mostra na hora.
     const d = await api<Detalhe>(`/painel/planos/${id}`);
-    setSel(d);
+    setSel({ ...d, acompanhamento: [] });
     setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
     setCfg({ titulo: d.titulo, subtitulo: d.subtitulo ?? '', descricao: d.descricao ?? '', prazoEm: onlyDate(d.prazoEm), releasedAt: onlyDate(d.releasedAt), agendamento: d.agendamento ?? 'fixo', liberaAposDias: String(d.liberaAposDias ?? 0), prazoDias: d.prazoDias != null ? String(d.prazoDias) : '', xpEntrega: String(d.xpEntrega ?? 0), penalizarAtraso: d.penalizarAtraso, penalidadeAtrasoPct: d.penalidadeAtrasoPct != null ? String(d.penalidadeAtrasoPct) : '20', analiseAtiva: d.analiseAtiva });
     setCapaPath(d.capaUrl);
@@ -79,15 +83,24 @@ export default function PlanosProdutorPage() {
       const fonte = d.capaUrl.startsWith('http') ? Promise.resolve(d.capaUrl) : urlAssinada(d.capaUrl);
       fonte.then(setCapaPreview).catch(() => {});
     }
+    // 2) Aulas da trilha (com cache — não rebusca a cada clique).
     if (d.trilhaId) {
-      try {
-        const t = await api<TrilhaDetalhe>(`/painel/trilhas/${d.trilhaId}`);
+      const aplicar = (t: TrilhaDetalhe) => {
         const mods = d.moduloId ? t.modulos.filter((m) => m.id === d.moduloId) : t.modulos;
         setAulasDoPlano(mods.flatMap((m) => m.aulas.map((a) => ({ id: a.id, titulo: a.titulo }))));
-      } catch { setAulasDoPlano([]); }
+      };
+      const cache = trilhaCache.current.get(d.trilhaId);
+      if (cache) aplicar(cache);
+      else api<TrilhaDetalhe>(`/painel/trilhas/${d.trilhaId}`).then((t) => { trilhaCache.current.set(d.trilhaId!, t); aplicar(t); }).catch(() => setAulasDoPlano([]));
     } else {
       setAulasDoPlano([]);
     }
+    // 3) Acompanhamento (pesado) — sob demanda, não trava a abertura.
+    setAcompCarregando(true);
+    api<Aluno[]>(`/painel/planos/${id}/acompanhamento`)
+      .then((a) => setSel((prev) => (prev && prev.id === id ? { ...prev, acompanhamento: a } : prev)))
+      .catch(() => {})
+      .finally(() => setAcompCarregando(false));
   }
 
   async function carregarModulos(trilhaId: string) {
@@ -182,9 +195,10 @@ export default function PlanosProdutorPage() {
   async function enviarCapa(file: File) {
     setEnviandoCapa(true);
     try {
-      const path = await uploadArquivo('imagens', file);
+      const arq = await comprimirImagem(file);
+      const path = await uploadArquivo('imagens', arq);
       setCapaPath(path);
-      setCapaPreview(URL.createObjectURL(file));
+      setCapaPreview(URL.createObjectURL(arq));
       toast.success('Capa enviada. Clique em “Salvar plano”.');
     } catch {
       toast.error('Falha ao enviar a capa.');
@@ -209,8 +223,9 @@ export default function PlanosProdutorPage() {
     if (!sel || !novoItem.titulo.trim() || busy) return;
     if ((novoItem.tipo === 'assistir' || novoItem.tipo === 'resumo') && !novoItem.aulaId) { toast.error('Selecione a aula desta tarefa.'); return; }
     setBusy(true);
+    const planoId = sel.id;
     try {
-      await api(`/painel/planos/${sel.id}/itens`, {
+      const criado = await api<{ id: string; titulo: string; descricao: string | null; tipo: TipoItem; aulaId: string | null; prazoEm: string | null; prazoDias: number | null; ordem: number }>(`/painel/planos/${planoId}/itens`, {
         method: 'POST',
         body: JSON.stringify({
           titulo: novoItem.titulo,
@@ -222,8 +237,15 @@ export default function PlanosProdutorPage() {
             : { prazoEm: novoItem.prazoEm ? new Date(novoItem.prazoEm).toISOString() : undefined }),
         }),
       });
+      // otimista: acrescenta o item na lista sem recarregar o plano inteiro
+      const it: Item = {
+        id: criado.id, titulo: criado.titulo, descricao: criado.descricao, tipo: criado.tipo,
+        prazoEm: criado.prazoEm, prazoDias: criado.prazoDias, ordem: criado.ordem,
+        aula: criado.aulaId ? { id: criado.aulaId, titulo: aulasDoPlano.find((a) => a.id === criado.aulaId)?.titulo ?? '', trilhaId: sel.trilhaId ?? '' } : null,
+      };
+      setSel((prev) => (prev && prev.id === planoId ? { ...prev, itens: [...prev.itens, it] } : prev));
       setNovoItem({ titulo: '', descricao: '', tipo: 'check', aulaId: '', prazoEm: '', prazoDias: '' });
-      await abrir(sel.id);
+      carregar(); // atualiza a contagem na lista, sem travar
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao adicionar tarefa');
     } finally {
@@ -233,11 +255,16 @@ export default function PlanosProdutorPage() {
 
   function removerItem(itemId: string) {
     if (!sel) return;
+    const planoId = sel.id;
     pedirConfirmacao('Remover esta tarefa do plano?', async () => {
+      setSel((prev) => (prev ? { ...prev, itens: prev.itens.filter((i) => i.id !== itemId) } : prev)); // otimista
       try {
         await api(`/painel/planos/itens/${itemId}`, { method: 'DELETE' });
-        await abrir(sel.id);
-      } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao remover'); }
+        carregar();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erro ao remover');
+        abrir(planoId); // reverte recarregando
+      }
     });
   }
 
@@ -477,7 +504,9 @@ export default function PlanosProdutorPage() {
                     <tr><th className="px-4 py-2 font-medium">Aluno</th><th className="px-4 py-2 font-medium">Progresso</th><th className="px-4 py-2 font-medium">Atrasados</th><th className="px-4 py-2 font-medium">Entrega</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {sel.acompanhamento.length === 0 ? (
+                    {acompCarregando && sel.acompanhamento.length === 0 ? (
+                      <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">Carregando acompanhamento…</td></tr>
+                    ) : sel.acompanhamento.length === 0 ? (
                       <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">Nenhum aluno na audiência deste plano.</td></tr>
                     ) : sel.acompanhamento.map((a) => (
                       <tr key={a.id} onClick={() => abrirAluno(a.id)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40">

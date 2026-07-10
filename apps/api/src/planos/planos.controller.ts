@@ -28,6 +28,11 @@ export class PlanosPainelController {
     return this.planos.obterPlano(u, id);
   }
 
+  @Get(':id/acompanhamento')
+  acompanhamento(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.planos.acompanhamentoPlano(u, id);
+  }
+
   @Patch(':id')
   atualizar(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: AtualizarPlanoDto) {
     return this.planos.atualizarPlano(u, id, dto);

@@ -92,52 +92,11 @@ export class PlanosService {
     }));
   }
 
-  // Detalhe + acompanhamento (quem está em dia / atrasado / entregou).
+  // Detalhe do plano (leve): dados + tarefas. O acompanhamento (pesado) vem à parte.
   async obterPlano(user: AuthUser, id: string) {
     const plano = await this.planoDaConta(user.contaId!, id);
     const itens = await this.prisma.planoItem.findMany({ where: { planoId: id }, orderBy: { ordem: 'asc' } });
     const aulasMap = await this.aulasDosItens(itens);
-
-    const alunos = await this.alunosAudiencia(user.contaId!, plano.trilhaId);
-    const alunoIds = alunos.map((a) => a.id);
-    const itemIds = itens.map((i) => i.id);
-    const progresso = itemIds.length
-      ? await this.prisma.planoItemProgresso.findMany({ where: { itemId: { in: itemIds } } })
-      : [];
-    const assistidos = await this.aulasConcluidasPorAluno(itens, alunoIds);
-    const entregas = await this.prisma.planoEntrega.findMany({ where: { planoId: id } });
-    const entregaMap = new Map(entregas.map((e) => [e.usuarioId, e]));
-
-    const itemConcluido = (it: (typeof itens)[number], usuarioId: string) =>
-      it.tipo === PlanoItemTipo.assistir
-        ? !!(it.aulaId && assistidos.get(usuarioId)?.has(it.aulaId))
-        : progresso.some((p) => p.itemId === it.id && p.usuarioId === usuarioId && p.concluido);
-
-    const agora = Date.now();
-    const ancoras = await this.resolverAncoras(plano, alunoIds);
-    const acompanhamento = alunos.map((a) => {
-      const anchor = ancoras.get(a.id) ?? null;
-      const concluidos = itens.filter((it) => itemConcluido(it, a.id)).length;
-      const atrasados = itens.filter((it) => {
-        const pr = this.prazoItem(plano, it, anchor);
-        return pr && pr.getTime() < agora && !itemConcluido(it, a.id);
-      }).length;
-      const e = entregaMap.get(a.id);
-      return {
-        id: a.id,
-        nome: a.nome,
-        email: a.email,
-        totalItens: itens.length,
-        concluidos,
-        atrasados,
-        emDia: atrasados === 0,
-        percentual: itens.length ? Math.round((concluidos / itens.length) * 100) : 0,
-        entregue: !!e,
-        entregaStatus: e?.status ?? null,
-        submittedAt: e?.submittedAt ?? null,
-        diasAntesDoPrazo: e?.diasAntesDoPrazo ?? null,
-      };
-    });
 
     return {
       id: plano.id,
@@ -167,8 +126,54 @@ export class PlanosService {
         ordem: i.ordem,
         aula: i.aulaId ? aulasMap.get(i.aulaId) ?? null : null,
       })),
-      acompanhamento,
     };
+  }
+
+  // Acompanhamento (pesado): quem está em dia / atrasado / entregou. Carregado sob demanda.
+  async acompanhamentoPlano(user: AuthUser, id: string) {
+    const plano = await this.planoDaConta(user.contaId!, id);
+    const itens = await this.prisma.planoItem.findMany({ where: { planoId: id }, orderBy: { ordem: 'asc' } });
+
+    const alunos = await this.alunosAudiencia(user.contaId!, plano.trilhaId);
+    const alunoIds = alunos.map((a) => a.id);
+    const itemIds = itens.map((i) => i.id);
+    const progresso = itemIds.length
+      ? await this.prisma.planoItemProgresso.findMany({ where: { itemId: { in: itemIds } } })
+      : [];
+    const assistidos = await this.aulasConcluidasPorAluno(itens, alunoIds);
+    const entregas = await this.prisma.planoEntrega.findMany({ where: { planoId: id } });
+    const entregaMap = new Map(entregas.map((e) => [e.usuarioId, e]));
+
+    const itemConcluido = (it: (typeof itens)[number], usuarioId: string) =>
+      it.tipo === PlanoItemTipo.assistir
+        ? !!(it.aulaId && assistidos.get(usuarioId)?.has(it.aulaId))
+        : progresso.some((p) => p.itemId === it.id && p.usuarioId === usuarioId && p.concluido);
+
+    const agora = Date.now();
+    const ancoras = await this.resolverAncoras(plano, alunoIds);
+    return alunos.map((a) => {
+      const anchor = ancoras.get(a.id) ?? null;
+      const concluidos = itens.filter((it) => itemConcluido(it, a.id)).length;
+      const atrasados = itens.filter((it) => {
+        const pr = this.prazoItem(plano, it, anchor);
+        return pr && pr.getTime() < agora && !itemConcluido(it, a.id);
+      }).length;
+      const e = entregaMap.get(a.id);
+      return {
+        id: a.id,
+        nome: a.nome,
+        email: a.email,
+        totalItens: itens.length,
+        concluidos,
+        atrasados,
+        emDia: atrasados === 0,
+        percentual: itens.length ? Math.round((concluidos / itens.length) * 100) : 0,
+        entregue: !!e,
+        entregaStatus: e?.status ?? null,
+        submittedAt: e?.submittedAt ?? null,
+        diasAntesDoPrazo: e?.diasAntesDoPrazo ?? null,
+      };
+    });
   }
 
   // Detalhe do progresso de UM aluno (o que cumpriu / falta + entregas + análise).
