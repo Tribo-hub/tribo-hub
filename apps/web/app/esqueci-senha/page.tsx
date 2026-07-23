@@ -54,19 +54,19 @@ export default function EsqueciSenhaPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+                className="w-full ui-input dark:text-white mt-1"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 dark:text-slate-400">Conta (subdomínio) — opcional</label>
+              <label className="text-xs text-slate-500 dark:text-slate-400">Código da sua conta — opcional</label>
               <input
                 type="text"
                 value={tenant}
                 onChange={(e) => setTenant(e.target.value)}
                 placeholder="ex.: academia-do-trafego"
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+                className="w-full ui-input dark:text-white mt-1"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Alunos/gestores: informe a conta (em produção vem do endereço).</p>
+              <p className="text-[11px] text-slate-400 mt-1">Aluno ou gestor de uma área de membros? Informe o código da sua conta.</p>
             </div>
             <button
               type="submit"

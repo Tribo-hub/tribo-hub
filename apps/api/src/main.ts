@@ -11,7 +11,9 @@ async function bootstrap() {
   initSentry();
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
-  app.enableCors({ origin: [env.APP_URL], credentials: true });
+  // Origens permitidas: domínio de marca (APP_URL) + fallback do Pages durante a transição
+  const origensCors = [...new Set([env.APP_URL, 'https://tribohub.pages.dev'])];
+  app.enableCors({ origin: origensCors, credentials: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),

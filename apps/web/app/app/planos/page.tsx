@@ -10,6 +10,8 @@ interface PlanoCard {
   titulo: string;
   subtitulo: string | null;
   ordem: number;
+  trilhaId: string | null;
+  trilhaTitulo: string | null;
   capaUrl: string | null;
   prazoEm: string | null;
   releasedAt: string | null;
@@ -47,6 +49,7 @@ export default function PlanosAlunoPage() {
   const [planos, setPlanos] = useState<PlanoCard[]>([]);
   const [cor, setCor] = useState('#7c3aed');
   const [carregando, setCarregando] = useState(true);
+  const [filtroTrilha, setFiltroTrilha] = useState(''); // '' = todas
 
   const carregar = useCallback(async () => {
     try {
@@ -74,13 +77,30 @@ export default function PlanosAlunoPage() {
         <h1 className="text-xl font-bold mb-1">Planos de ação</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Cumpra as tarefas no prazo e entregue o seu plano.</p>
 
+        {(() => {
+          const nomes = [...new Set(planos.map((p) => p.trilhaTitulo ?? 'Geral'))];
+          if (nomes.length <= 1) return null;
+          return (
+            <div className="mb-6 max-w-xs">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Trilha / curso</label>
+              <select value={filtroTrilha} onChange={(e) => setFiltroTrilha(e.target.value)} className="w-full ui-input text-sm">
+                <option value="">Todas as trilhas ({planos.length})</option>
+                {nomes.map((n) => {
+                  const c = planos.filter((p) => (p.trilhaTitulo ?? 'Geral') === n).length;
+                  return <option key={n} value={n}>{n} ({c})</option>;
+                })}
+              </select>
+            </div>
+          );
+        })()}
+
         {carregando ? (
           <p className="text-slate-500">Carregando...</p>
         ) : planos.length === 0 ? (
           <p className="text-slate-500 text-sm">Nenhum plano de ação disponível no momento.</p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {planos.map((p) => {
+            {planos.filter((p) => !filtroTrilha || (p.trilhaTitulo ?? 'Geral') === filtroTrilha).map((p) => {
               const cd = countdown(p);
               const concluido = p.entregue;
               const Card = (

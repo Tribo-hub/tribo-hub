@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
 import { Shell } from '../../../components/Shell';
+import { CopyButton } from '../../../components/CopyButton';
+import { Badge } from '../../../components/ui/Badge';
 
 interface Conta {
   id: string;
@@ -30,6 +32,8 @@ interface CriarResposta {
 export default function ContasPage() {
   const router = useRouter();
   const [contas, setContas] = useState<Conta[]>([]);
+  const [busca, setBusca] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'infoprodutor' | 'corporativo'>('todos');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [criando, setCriando] = useState(false);
@@ -88,6 +92,14 @@ export default function ContasPage() {
     }
   }
 
+  const visiveis = contas.filter(
+    (c) =>
+      (filtroTipo === 'todos' || c.tipoConta === filtroTipo) &&
+      (!busca ||
+        c.nome.toLowerCase().includes(busca.toLowerCase()) ||
+        c.slug.toLowerCase().includes(busca.toLowerCase())),
+  );
+
   return (
     <Shell area="admin">
       <div className="p-6 space-y-6">
@@ -98,7 +110,7 @@ export default function ContasPage() {
             { label: 'Corporativo', value: contas.filter((c) => c.tipoConta === 'corporativo').length },
             { label: 'Ativas', value: contas.filter((c) => c.ativo).length },
           ].map((s) => (
-            <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+            <div key={s.label} className="ui-card p-5">
               <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
               <p className="text-3xl font-bold mt-1">{s.value}</p>
             </div>
@@ -110,13 +122,31 @@ export default function ContasPage() {
         <section>
           <h1 className="text-xl font-bold mb-4">Contas</h1>
           {erro && <p className="text-sm text-rose-600 mb-3">{erro}</p>}
+
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="🔎 Buscar por nome ou código..."
+              className="flex-1 min-w-[180px] border border-slate-300 dark:border-slate-600 dark:bg-slate-800 rounded-lg px-3 py-2 text-sm"
+            />
+            <div className="flex gap-1 text-sm">
+              {(['todos', 'infoprodutor', 'corporativo'] as const).map((t) => (
+                <button key={t} onClick={() => setFiltroTipo(t)}
+                  className={`px-3 py-1.5 rounded-lg capitalize ${filtroTipo === t ? 'bg-tribo-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}>
+                  {t === 'todos' ? 'Todos' : t}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {carregando ? (
             <p className="text-slate-500">Carregando...</p>
-          ) : contas.length === 0 ? (
-            <p className="text-slate-500 text-sm">Nenhuma conta ainda. Crie a primeira ao lado →</p>
+          ) : visiveis.length === 0 ? (
+            <p className="text-slate-500 text-sm">{contas.length === 0 ? 'Nenhuma conta ainda. Crie a primeira ao lado →' : 'Nenhuma conta neste filtro.'}</p>
           ) : (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
-              {contas.map((c) => (
+            <div className="ui-card divide-y divide-slate-100 dark:divide-slate-700">
+              {visiveis.map((c) => (
                 <Link
                   key={c.id}
                   href={`/admin/contas/detalhe?id=${c.id}`}
@@ -129,15 +159,7 @@ export default function ContasPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        c.tipoConta === 'infoprodutor'
-                          ? 'bg-tribo-100 text-tribo-700 dark:bg-tribo-900/40 dark:text-tribo-300'
-                          : 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                      }`}
-                    >
-                      {c.tipoConta}
-                    </span>
+                    <Badge tom={c.tipoConta === 'infoprodutor' ? 'brand' : 'info'}>{c.tipoConta}</Badge>
                     <p className="text-xs text-slate-400 mt-1">{c.assinatura?.plano}</p>
                   </div>
                 </Link>
@@ -147,7 +169,7 @@ export default function ContasPage() {
         </section>
 
         {/* criar */}
-        <aside className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 h-fit">
+        <aside className="ui-card p-5 h-fit">
           <h2 className="font-semibold mb-3">Nova conta</h2>
 
           {novoAdmin && (
@@ -159,8 +181,10 @@ export default function ContasPage() {
               ) : (
                 <span className="opacity-80">⚠️ E-mail não enviado (Resend?). Use a senha temporária abaixo.</span>
               )}
-              <br />
-              Senha temporária (fallback): <b>{novoAdmin.senhaTemporaria}</b>
+              <div className="flex items-center gap-2 mt-1">
+                <span>Senha temporária (fallback): <b>{novoAdmin.senhaTemporaria}</b></span>
+                <CopyButton texto={novoAdmin.senhaTemporaria} label="copiar senha" />
+              </div>
             </div>
           )}
 
@@ -170,12 +194,12 @@ export default function ContasPage() {
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
               required
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <select
               value={form.tipoConta}
               onChange={(e) => setForm({ ...form, tipoConta: e.target.value })}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             >
               <option value="infoprodutor">Infoprodutor</option>
               <option value="corporativo">Corporativo</option>
@@ -185,7 +209,7 @@ export default function ContasPage() {
               value={form.adminNome}
               onChange={(e) => setForm({ ...form, adminNome: e.target.value })}
               required
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <input
               type="email"
@@ -193,7 +217,7 @@ export default function ContasPage() {
               value={form.adminEmail}
               onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
               required
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full ui-input"
             />
             <button
               type="submit"

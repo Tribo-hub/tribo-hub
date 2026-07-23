@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PlataformaExterna, StatusMatricula, StatusTransacao, TipoConta } from '@tribohub/db';
-import { randomUUID } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { InfoprodutorService } from './infoprodutor.service';
@@ -54,8 +54,14 @@ export class WebhookService {
     return this.aplicar(PlataformaExterna.eduzz, contaId, body, this.parseEduzz(body));
   }
 
-  // ---------- Validação comum (conta + segredo da integração) ----------
-  private async validar(contaId: string, plataforma: PlataformaExterna, secret: string | undefined) {
+  // Checkout Efí via middleware do produtor — validado por HMAC (não por segredo em texto).
+  async efi(contaId: string, assinatura: string | undefined, body: any) {
+    await this.validarEfi(contaId, body, assinatura);
+    return this.aplicar(PlataformaExterna.efi, contaId, body, this.parseEfi(body));
+  }
+
+  // ---------- Validação comum (conta + integração ativa) ----------
+  private async buscarIntegracao(contaId: string, plataforma: PlataformaExterna) {
     const conta = await this.prisma.conta.findUnique({ where: { id: contaId } });
     if (!conta || !conta.ativo || conta.tipoConta !== TipoConta.infoprodutor) {
       throw new NotFoundException('Conta inválida');
@@ -63,9 +69,37 @@ export class WebhookService {
     const integ = await this.prisma.integracao.findUnique({
       where: { contaId_plataforma: { contaId, plataforma } },
     });
-    if (!integ || !integ.ativo || !integ.webhookSecret || integ.webhookSecret !== secret) {
+    if (!integ || !integ.ativo || !integ.webhookSecret) {
       throw new UnauthorizedException('Webhook não autorizado');
     }
+    return integ;
+  }
+
+  // Hotmart/Kiwify/Eduzz: segredo estático comparado por igualdade.
+  private async validar(contaId: string, plataforma: PlataformaExterna, secret: string | undefined) {
+    const integ = await this.buscarIntegracao(contaId, plataforma);
+    if (integ.webhookSecret !== secret) {
+      throw new UnauthorizedException('Webhook não autorizado');
+    }
+  }
+
+  // Efí: assinatura HMAC-SHA256 dos campos canônicos, comparada em tempo constante.
+  private async validarEfi(contaId: string, body: any, assinatura: string | undefined) {
+    const integ = await this.buscarIntegracao(contaId, PlataformaExterna.efi);
+    const esperada = this.assinaturaEfi(integ.webhookSecret as string, body);
+    const enviada = Buffer.from(assinatura ?? '', 'utf8');
+    const referencia = Buffer.from(esperada, 'utf8');
+    if (enviada.length !== referencia.length || !timingSafeEqual(enviada, referencia)) {
+      throw new UnauthorizedException('Assinatura inválida');
+    }
+  }
+
+  // Base assinada = "evento.email.produtoId.transacao.valor" (valores crus, na ordem, unidos por ".").
+  private assinaturaEfi(secret: string, body: any): string {
+    const base = [body?.evento, body?.email, body?.produtoId, body?.transacao, body?.valor]
+      .map((v) => String(v ?? ''))
+      .join('.');
+    return createHmac('sha256', secret).update(base).digest('hex');
   }
 
   // ---------- Núcleo: libera/revoga acesso a partir do evento normalizado ----------
@@ -222,6 +256,22 @@ export class WebhookService {
       produtoId,
       transacao: String(body?.trans_cod ?? body?.id ?? `${produtoId}-${email}`),
       valor: Number(body?.trans_value ?? body?.value ?? 0),
+    };
+  }
+
+  // Efí — payload já normalizado pelo middleware do produtor.
+  // evento é case-insensitive; valor chega em CENTAVOS e é gravado em reais (÷100), como na Kiwify.
+  private parseEfi(body: any): EventoNorm {
+    const evento = String(body?.evento ?? '').toUpperCase();
+    const centavos = Number(body?.valor ?? 0);
+    const email: string | undefined = body?.email;
+    return {
+      tipo: EVENTOS_LIBERA.includes(evento) ? 'libera' : EVENTOS_REVOGA.includes(evento) ? 'revoga' : 'ignora',
+      email,
+      nome: body?.nome ?? email ?? 'Aluno',
+      produtoId: String(body?.produtoId ?? ''),
+      transacao: String(body?.transacao ?? ''),
+      valor: centavos > 0 ? centavos / 100 : 0,
     };
   }
 }

@@ -21,11 +21,31 @@ export class CorporativoService {
   ) {}
 
   // ---------- Marca (white-label self-service) ----------
-  async atualizarMarca(contaId: string, dto: { corPrimaria?: string; logoUrl?: string }) {
+  async atualizarMarca(
+    contaId: string,
+    dto: { corPrimaria?: string; logoUrl?: string; boasVindasAtivo?: boolean; mensagemBoasVindas?: string },
+  ) {
     return this.prisma.conta.update({
       where: { id: contaId },
-      data: { corPrimaria: dto.corPrimaria, logoUrl: dto.logoUrl },
-      select: { corPrimaria: true, logoUrl: true },
+      data: {
+        corPrimaria: dto.corPrimaria,
+        logoUrl: dto.logoUrl,
+        boasVindasAtivo: dto.boasVindasAtivo,
+        mensagemBoasVindas: dto.mensagemBoasVindas,
+      },
+      select: { corPrimaria: true, logoUrl: true, boasVindasAtivo: true, mensagemBoasVindas: true },
+    });
+  }
+
+  // Recursos (feature flags) que o próprio produtor liga/desliga na sua conta.
+  async atualizarRecursos(
+    contaId: string,
+    dto: { agendaAtiva?: boolean; planosAtivos?: boolean; gamificacaoAtiva?: boolean },
+  ) {
+    return this.prisma.conta.update({
+      where: { id: contaId },
+      data: { agendaAtiva: dto.agendaAtiva, planosAtivos: dto.planosAtivos, gamificacaoAtiva: dto.gamificacaoAtiva },
+      select: { agendaAtiva: true, planosAtivos: true, gamificacaoAtiva: true },
     });
   }
 

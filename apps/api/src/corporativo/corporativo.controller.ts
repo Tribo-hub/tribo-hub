@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@tribohub/db';
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -26,6 +26,29 @@ class MarcaDto {
   @IsString()
   @MaxLength(500)
   logoUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  boasVindasAtivo?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  mensagemBoasVindas?: string;
+}
+
+class RecursosDto {
+  @IsOptional()
+  @IsBoolean()
+  agendaAtiva?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  planosAtivos?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  gamificacaoAtiva?: boolean;
 }
 
 @Controller('painel')
@@ -37,6 +60,11 @@ export class CorporativoController {
   @Patch('marca')
   atualizarMarca(@CurrentUser() u: AuthUser, @Body() dto: MarcaDto) {
     return this.corp.atualizarMarca(u.contaId!, dto);
+  }
+
+  @Patch('recursos')
+  atualizarRecursos(@CurrentUser() u: AuthUser, @Body() dto: RecursosDto) {
+    return this.corp.atualizarRecursos(u.contaId!, dto);
   }
 
   @Post('colaboradores')

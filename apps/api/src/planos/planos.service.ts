@@ -313,6 +313,12 @@ export class PlanosService {
       include: { itens: true },
     });
 
+    const trilhaIds = [...new Set(planos.map((p) => p.trilhaId).filter(Boolean))] as string[];
+    const trilhasInfo = trilhaIds.length
+      ? await this.prisma.trilha.findMany({ where: { id: { in: trilhaIds } }, select: { id: true, titulo: true } })
+      : [];
+    const trilhaNome = new Map(trilhasInfo.map((t) => [t.id, t.titulo]));
+
     const todosItens = planos.flatMap((p) => p.itens);
     const progresso = todosItens.length
       ? await this.prisma.planoItemProgresso.findMany({ where: { itemId: { in: todosItens.map((i) => i.id) }, usuarioId: user.sub } })
@@ -335,6 +341,7 @@ export class PlanosService {
           subtitulo: p.subtitulo,
           ordem: p.ordem,
           trilhaId: p.trilhaId,
+          trilhaTitulo: p.trilhaId ? trilhaNome.get(p.trilhaId) ?? null : null,
           capaUrl: await this.assinarSeArquivo(p.capaUrl),
           prazoEm,
           releasedAt,

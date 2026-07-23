@@ -58,6 +58,22 @@ export class UpdateContaDto {
   @IsOptional()
   @IsBoolean()
   permiteAutoCadastro?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  permiteComentarios?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  sessaoUnica?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  boasVindasAtivo?: boolean;
+
+  @IsOptional()
+  @IsString()
+  mensagemBoasVindas?: string;
 }
 
 export class UpdateAssinaturaDto {

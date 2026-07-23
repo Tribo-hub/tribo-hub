@@ -202,14 +202,14 @@ export default function AppHome() {
             {/* Cabeçalho da jornada */}
             <section>
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {jornada.opcoes.length > 1 && (
-                    <select value={jornada.sel} onChange={(e) => selecionar(e.target.value)} className="ui-input text-sm py-1.5">
+                    <select value={jornada.sel} onChange={(e) => selecionar(e.target.value)} className="ui-input text-sm py-1.5 min-w-0 flex-1 max-w-full truncate">
                       {jornada.opcoes.map((o) => <option key={o.valor} value={o.valor}>{o.label}{o.temPlanos ? '' : ' (só aulas)'}</option>)}
                     </select>
                   )}
                   {jornada.nivel != null && (
-                    <Link href="/app/conquistas" className="text-xs font-semibold rounded-full px-3 py-1.5" style={{ backgroundColor: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}>
+                    <Link href="/app/conquistas" className="shrink-0 whitespace-nowrap text-xs font-semibold rounded-full px-3 py-1.5" style={{ backgroundColor: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}>
                       ⚡ Nível {jornada.nivel} · {jornada.xp} XP
                     </Link>
                   )}
@@ -252,7 +252,7 @@ export default function AppHome() {
                     <>
                     {/* Régua da jornada — selecionável, com rolagem */}
                     <div className="ui-card p-4 mt-4">
-                      <div ref={reguaRef} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
+                      <div ref={reguaRef} className="scroll-x-visivel pb-2">
                         <div className="relative flex gap-2 min-w-max px-3">
                           <div className="absolute left-8 right-8 top-[14px] h-0.5 bg-slate-200 dark:bg-slate-700" />
                           {jornada.planos.map((p) => {
@@ -265,7 +265,7 @@ export default function AppHome() {
                                   style={bg ? { backgroundColor: bg, color: '#fff', borderColor: bg } : (selecionado ? { boxShadow: `0 0 0 3px color-mix(in srgb, ${cor} 30%, transparent)`, borderColor: cor } : undefined)}>
                                   {p.entregue ? '✓' : p.bloqueado ? '🔒' : p.ordem}
                                 </span>
-                                <span className={`text-[10px] mt-1 leading-tight text-center truncate w-full ${selecionado ? 'font-bold' : 'text-slate-400'}`} style={selecionado ? { color: cor } : undefined}>{p.titulo}</span>
+                                <span className={`text-[10px] mt-1 leading-tight text-center line-clamp-2 w-full min-h-[26px] ${selecionado ? 'font-bold' : 'text-slate-400'}`} style={selecionado ? { color: cor } : undefined}>{p.titulo}</span>
                               </button>
                             );
                           })}

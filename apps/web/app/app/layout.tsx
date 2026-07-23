@@ -27,7 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setOpen(false)} />}
       <AlunoSidebar mobileOpen={open} onClose={() => setOpen(false)} />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-x-clip">
         {/* Topo só no mobile: abre o menu lateral */}
         <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 h-14">
           <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="p-1 text-slate-600 dark:text-slate-300">

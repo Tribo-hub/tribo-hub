@@ -40,7 +40,7 @@ function Form() {
           <div>
             <label className="text-xs text-slate-500 dark:text-slate-400">Defina sua senha (mín. 8 caracteres)</label>
             <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required minLength={8}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm mt-1" />
+              className="w-full ui-input mt-1" />
           </div>
           <button className="w-full bg-tribo-600 hover:bg-tribo-700 text-white font-semibold py-2.5 rounded-lg text-sm">Ativar e entrar</button>
         </>

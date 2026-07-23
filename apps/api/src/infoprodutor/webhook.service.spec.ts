@@ -1,3 +1,4 @@
+import { createHmac } from 'crypto';
 import { WebhookService } from './webhook.service';
 
 const conta = { ativo: true, tipoConta: 'infoprodutor' };
@@ -26,6 +27,7 @@ function mkPrisma(over: any = {}) {
     transacao: { upsert: jest.fn().mockResolvedValue({ id: 'tr1' }), updateMany: jest.fn() },
     usuario: { findFirst: jest.fn().mockResolvedValue({ id: 'u1' }) },
     matricula: { updateMany: jest.fn() },
+    notificacao: { create: jest.fn().mockResolvedValue({}) },
     ...over,
   } as any;
 }
@@ -33,6 +35,7 @@ function mkPrisma(over: any = {}) {
 const info = {
   encontrarOuCriarAluno: jest.fn().mockResolvedValue({ id: 'u1' }),
   upsertMatricula: jest.fn().mockResolvedValue({}),
+  resolverTurma: jest.fn().mockResolvedValue(undefined),
 } as any;
 
 const email = { acessoLiberado: jest.fn().mockResolvedValue({}) } as any;
@@ -67,5 +70,60 @@ describe('WebhookService.hotmart', () => {
     const r = await new WebhookService(prisma, info, email).hotmart('c1', 'segredo', refund);
     expect(r.resultado).toBe('acesso_revogado');
     expect(prisma.matricula.updateMany).toHaveBeenCalled();
+  });
+});
+
+const efiPayload = {
+  evento: 'approved',
+  email: 'm@x.com',
+  nome: 'M',
+  produtoId: 'desafio-7-dias',
+  transacao: 'EFI1',
+  valor: 6700,
+};
+
+function assinarEfi(body: any, secret = 'segredo') {
+  const base = [body.evento, body.email, body.produtoId, body.transacao, body.valor]
+    .map((v) => String(v ?? ''))
+    .join('.');
+  return createHmac('sha256', secret).update(base).digest('hex');
+}
+
+describe('WebhookService.efi', () => {
+  beforeEach(() => {
+    info.encontrarOuCriarAluno.mockClear();
+    info.upsertMatricula.mockClear();
+  });
+
+  it('rejeita assinatura inválida', async () => {
+    await expect(
+      new WebhookService(mkPrisma(), info, email).efi('c1', 'assinatura-errada', efiPayload),
+    ).rejects.toThrow();
+  });
+
+  it('compra aprovada libera acesso e grava valor em reais (6700 → 67)', async () => {
+    const prisma = mkPrisma();
+    const r = await new WebhookService(prisma, info, email).efi('c1', assinarEfi(efiPayload), efiPayload);
+    expect(r.resultado).toBe('acesso_liberado');
+    expect(info.upsertMatricula).toHaveBeenCalled();
+    expect(prisma.transacao.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ valorBruto: 67 }) }),
+    );
+  });
+
+  it('reembolso revoga acesso (mesmo transacao)', async () => {
+    const refund = { ...efiPayload, evento: 'refunded' };
+    const prisma = mkPrisma();
+    const r = await new WebhookService(prisma, info, email).efi('c1', assinarEfi(refund), refund);
+    expect(r.resultado).toBe('acesso_revogado');
+    expect(prisma.matricula.updateMany).toHaveBeenCalled();
+  });
+
+  it('evento duplicado retorna { duplicate: true }', async () => {
+    const prisma = mkPrisma({
+      webhookEvent: { findUnique: jest.fn().mockResolvedValue({ id: 'x' }), create: jest.fn(), update: jest.fn() },
+    });
+    const r = await new WebhookService(prisma, info, email).efi('c1', assinarEfi(efiPayload), efiPayload);
+    expect(r).toEqual({ duplicate: true });
   });
 });

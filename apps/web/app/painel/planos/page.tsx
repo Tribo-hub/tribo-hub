@@ -307,8 +307,24 @@ export default function PlanosProdutorPage() {
         </div>
 
         <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-          {/* Novo plano (topo) + lista (abaixo) */}
+          {/* Seletor de trilha (topo) + Novo plano + lista (abaixo) */}
           <div className="flex flex-col gap-4">
+            {planos.length > 0 && (() => {
+              const nomes = [...new Set(planos.map((p) => p.trilhaTitulo ?? 'Todos os alunos'))];
+              if (nomes.length <= 1) return null;
+              return (
+                <div className="order-first ui-card p-3">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Trilha / curso</label>
+                  <select value={filtroTrilha} onChange={(e) => setFiltroTrilha(e.target.value)} className="w-full ui-input text-sm">
+                    <option value="">Todas as trilhas ({planos.length})</option>
+                    {nomes.map((n) => {
+                      const c = planos.filter((p) => (p.trilhaTitulo ?? 'Todos os alunos') === n).length;
+                      return <option key={n} value={n}>{n} ({c})</option>;
+                    })}
+                  </select>
+                </div>
+              );
+            })()}
             <section className="order-2 ui-card overflow-hidden">
               {planos.length === 0 ? (
                 <p className="p-4 text-center text-slate-400 text-sm">Nenhum plano ainda.</p>
@@ -323,17 +339,11 @@ export default function PlanosProdutorPage() {
                 const entradas = [...grupos.entries()].filter(([k]) => !filtroTrilha || k === filtroTrilha);
                 return (
                   <>
-                    {grupos.size > 1 && (
-                      <div className="p-2 border-b border-slate-100 dark:border-slate-700">
-                        <select value={filtroTrilha} onChange={(e) => setFiltroTrilha(e.target.value)} className="w-full ui-input text-sm">
-                          <option value="">Todas as trilhas ({planos.length})</option>
-                          {[...grupos.entries()].map(([k, ps]) => <option key={k} value={k}>{k} ({ps.length})</option>)}
-                        </select>
-                      </div>
-                    )}
                     {entradas.map(([k, ps]) => (
                       <div key={k}>
-                        <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-700/40 sticky top-0">{k} · {ps.length}</p>
+                        {!filtroTrilha && grupos.size > 1 && (
+                          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-700/40 sticky top-0">{k} · {ps.length}</p>
+                        )}
                         <div className="divide-y divide-slate-100 dark:divide-slate-700">
                           {ps.map((p) => (
                             <button key={p.id} onClick={() => abrir(p.id)} className={`w-full text-left p-3 ${sel?.id === p.id ? 'bg-slate-50 dark:bg-slate-700/40' : ''}`}>

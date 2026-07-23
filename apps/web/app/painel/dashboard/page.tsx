@@ -23,7 +23,7 @@ interface Dash {
 interface Fatura { valorBase: number; valorExcedente: number; valorTotal: number }
 interface Rank { usuarioId: string; nome: string; aulasConcluidas: number }
 interface Inativo { id: string; nome: string; ultimoAcesso: string | null }
-interface Curso { trilhaId: string; titulo: string; matriculas: number; certificados: number; taxaConclusao: number }
+interface Curso { trilhaId: string; titulo: string; matriculas: number; certificados: number; taxaConclusao: number; avaliacaoMedia: number | null; avaliacoes: number }
 interface Venda { id: string; aluno: string; valor: number; data: string }
 interface Vendas { receitaMes: number; vendasMes: number; ultimas: Venda[] }
 
@@ -166,7 +166,9 @@ export default function DashboardPage() {
                       <div key={c.trilhaId}>
                         <div className="flex justify-between mb-1">
                           <span className="truncate">{c.titulo}</span>
-                          <span className="text-slate-500 dark:text-slate-400">{c.taxaConclusao}% · {c.matriculas} mat.</span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {c.avaliacaoMedia ? `★ ${c.avaliacaoMedia} · ` : ''}{c.taxaConclusao}% · {c.matriculas} mat.
+                          </span>
                         </div>
                         <div className="bg-slate-100 dark:bg-slate-700 rounded-full h-1.5">
                           <div className="bg-tribo-600 h-1.5 rounded-full" style={{ width: `${c.taxaConclusao}%` }} />

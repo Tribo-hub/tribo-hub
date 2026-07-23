@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { Role } from '@tribohub/db';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { CortesiaDto, CreateOfertaDto, IntegracaoDto, ProrrogarDto } from './dto';
+import { CortesiaDto, CreateOfertaDto, EditarAlunoDto, IntegracaoDto, ProrrogarDto, UpdateOfertaDto } from './dto';
 import { InfoprodutorService } from './infoprodutor.service';
 
 @Controller('painel')
@@ -21,6 +21,14 @@ export class PainelInfoController {
   @Get('ofertas')
   ofertas(@CurrentUser() u: AuthUser) {
     return this.info.listarOfertas(u.contaId!);
+  }
+  @Patch('ofertas/:id')
+  atualizarOferta(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: UpdateOfertaDto) {
+    return this.info.atualizarOferta(u.contaId!, id, dto);
+  }
+  @Delete('ofertas/:id')
+  removerOferta(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.info.removerOferta(u.contaId!, id);
   }
 
   // Integrações
@@ -67,5 +75,11 @@ export class PainelInfoController {
   @Post('matriculas/cortesia')
   cortesia(@CurrentUser() u: AuthUser, @Body() dto: CortesiaDto) {
     return this.info.criarCortesia(u.contaId!, dto);
+  }
+
+  // Edição de aluno (nome/e-mail/telefone/senha)
+  @Patch('alunos/:id')
+  editarAluno(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: EditarAlunoDto) {
+    return this.info.atualizarAluno(u.contaId!, id, dto);
   }
 }

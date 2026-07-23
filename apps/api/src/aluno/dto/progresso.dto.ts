@@ -1,4 +1,5 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class ProgressoDto {
   @IsString()
@@ -13,4 +14,37 @@ export class ProgressoDto {
   @IsOptional()
   @IsBoolean()
   concluido?: boolean;
+}
+
+export class AvaliacaoDto {
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  nota!: number;
+}
+
+export class RespostaQuizItem {
+  @IsString()
+  perguntaId!: string;
+
+  @IsString()
+  @MaxLength(2000)
+  resposta!: string;
+}
+
+export class ResponderQuizDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RespostaQuizItem)
+  respostas!: RespostaQuizItem[];
+}
+
+export class ComentarioDto {
+  @IsString()
+  @MaxLength(2000)
+  texto!: string;
+
+  @IsOptional()
+  @IsString()
+  respostaAId?: string;
 }

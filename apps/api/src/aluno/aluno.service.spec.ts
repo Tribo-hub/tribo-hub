@@ -3,7 +3,7 @@ import { AlunoService } from './aluno.service';
 const alunoInfo = { sub: 'u1', role: 'aluno', contaId: 'A' } as any;
 
 function svc(prisma: any) {
-  return new AlunoService(prisma, {} as any);
+  return new AlunoService(prisma, {} as any, { registrar: jest.fn() } as any);
 }
 
 describe('AlunoService — isolamento de acesso', () => {

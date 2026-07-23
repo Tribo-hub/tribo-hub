@@ -9,10 +9,11 @@ import { toast } from '../../../lib/toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
 
-const PLATAFORMAS: { key: string; label: string; auth: 'header' | 'query'; secretLabel: string }[] = [
+const PLATAFORMAS: { key: string; label: string; auth: 'header' | 'query' | 'hmac'; secretLabel: string; path?: string }[] = [
   { key: 'hotmart', label: 'Hotmart', auth: 'header', secretLabel: 'hottok / segredo do webhook' },
   { key: 'kiwify', label: 'Kiwify', auth: 'query', secretLabel: 'token / segredo do webhook' },
   { key: 'eduzz', label: 'Eduzz', auth: 'query', secretLabel: 'token / segredo do webhook' },
+  { key: 'efi', label: 'Efí (checkout próprio)', auth: 'hmac', secretLabel: 'segredo HMAC da integração', path: 'efi-produto' },
 ];
 
 interface Trilha { id: string; titulo: string }
@@ -22,6 +23,7 @@ interface Oferta {
   nome: string;
   trilhaId: string;
   turmaId: string | null;
+  plataformaExterna: string | null;
   codigoProdutoExterno: string | null;
   tipoAcesso: string;
   duracaoAcessoDias: number | null;
@@ -36,7 +38,7 @@ export default function OfertasPage() {
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [integracoes, setIntegracoes] = useState<string[]>([]);
   const [secrets, setSecrets] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ trilhaId: '', turmaId: '', nome: '', codigoProdutoExterno: '', tipoAcesso: 'prazo', duracaoAcessoDias: 365 });
+  const [form, setForm] = useState({ trilhaId: '', turmaId: '', nome: '', plataformaExterna: 'hotmart', codigoProdutoExterno: '', tipoAcesso: 'prazo', duracaoAcessoDias: 365 });
   const [turmasOferta, setTurmasOferta] = useState<TurmaOpt[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -77,14 +79,15 @@ export default function OfertasPage() {
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro'); }
   }
 
-  function webhookUrl(plataforma: string, auth: 'header' | 'query') {
+  function webhookUrl(plataforma: string, auth: 'header' | 'query' | 'hmac') {
     if (!contaId) return '...';
-    const base = `${API_BASE}/webhooks/${plataforma}/${contaId}`;
+    const path = PLATAFORMAS.find((p) => p.key === plataforma)?.path ?? plataforma;
+    const base = `${API_BASE}/webhooks/${path}/${contaId}`;
     return auth === 'query' ? `${base}?token=${secrets[plataforma] || 'SEGREDO'}` : base;
   }
 
   function limparForm() {
-    setForm({ trilhaId: '', turmaId: '', nome: '', codigoProdutoExterno: '', tipoAcesso: 'prazo', duracaoAcessoDias: 365 });
+    setForm({ trilhaId: '', turmaId: '', nome: '', plataformaExterna: 'hotmart', codigoProdutoExterno: '', tipoAcesso: 'prazo', duracaoAcessoDias: 365 });
     setTurmasOferta([]);
     setEditId(null);
   }
@@ -111,6 +114,7 @@ export default function OfertasPage() {
       trilhaId: o.trilhaId,
       turmaId: o.turmaId ?? '',
       nome: o.nome,
+      plataformaExterna: o.plataformaExterna ?? 'hotmart',
       codigoProdutoExterno: o.codigoProdutoExterno ?? '',
       tipoAcesso: o.tipoAcesso,
       duracaoAcessoDias: o.duracaoAcessoDias ?? 365,
@@ -166,6 +170,9 @@ export default function OfertasPage() {
                   {p.auth === 'query' && (
                     <p className="text-[11px] text-slate-400 mt-2">Salve o segredo e cole a URL acima (com o <code>?token=</code>) na {p.label}.</p>
                   )}
+                  {p.auth === 'hmac' && (
+                    <p className="text-[11px] text-slate-400 mt-2">Seu middleware assina cada aviso com HMAC-SHA256 e envia no header <code>x-efi-assinatura</code>. Salve o mesmo segredo aqui e no middleware.</p>
+                  )}
                 </div>
               );
             })}
@@ -190,7 +197,7 @@ export default function OfertasPage() {
                         <button onClick={() => excluirOferta(o)} className="text-xs text-rose-500">excluir</button>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">produto #{o.codigoProdutoExterno} → {o.trilha.titulo}{o.turma?.nome && <span className="text-tribo-600"> · 🎓 {o.turma.nome}</span>}</p>
+                    <p className="text-xs text-slate-500 mt-1">{o.plataformaExterna && <span className="uppercase text-slate-400">{o.plataformaExterna} · </span>}produto #{o.codigoProdutoExterno} → {o.trilha.titulo}{o.turma?.nome && <span className="text-tribo-600"> · 🎓 {o.turma.nome}</span>}</p>
                   </div>
                 ))}
               </div>
@@ -215,7 +222,11 @@ export default function OfertasPage() {
               )}
               <input placeholder="Nome da oferta" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required
                 className="w-full ui-input" />
-              <input placeholder="Código do produto (Hotmart)" value={form.codigoProdutoExterno} onChange={(e) => setForm({ ...form, codigoProdutoExterno: e.target.value })} required
+              <select value={form.plataformaExterna} onChange={(e) => setForm({ ...form, plataformaExterna: e.target.value })}
+                className="w-full ui-input">
+                {PLATAFORMAS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              <input placeholder="Código do produto (ex.: desafio-7-dias)" value={form.codigoProdutoExterno} onChange={(e) => setForm({ ...form, codigoProdutoExterno: e.target.value })} required
                 className="w-full ui-input" />
               <select value={form.tipoAcesso} onChange={(e) => setForm({ ...form, tipoAcesso: e.target.value })}
                 className="w-full ui-input">

@@ -4,10 +4,18 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, clearToken, getToken, uploadArquivo } from '../../../lib/api';
 import { Shell } from '../../../components/Shell';
+import { RichTextField } from '../../../components/RichTextField';
+import { toast } from '../../../lib/toast';
 
 interface Me {
   nome: string;
-  conta?: { nome: string; corPrimaria: string | null; logoUrl: string | null };
+  conta?: {
+    nome: string;
+    corPrimaria: string | null;
+    logoUrl: string | null;
+    boasVindasAtivo?: boolean;
+    mensagemBoasVindas?: string | null;
+  };
 }
 
 export default function MarcaPage() {
@@ -16,9 +24,11 @@ export default function MarcaPage() {
   const [marca, setMarca] = useState('');
   const [cor, setCor] = useState('#7c3aed');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [msg, setMsg] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [bvAtivo, setBvAtivo] = useState(false);
+  const [bvMsg, setBvMsg] = useState('');
+  const [salvandoBv, setSalvandoBv] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -26,6 +36,8 @@ export default function MarcaPage() {
       setMarca(me.conta?.nome ?? 'Tribo Hub');
       setCor(me.conta?.corPrimaria || '#7c3aed');
       setLogoUrl(me.conta?.logoUrl ?? null);
+      setBvAtivo(me.conta?.boasVindasAtivo ?? false);
+      setBvMsg(me.conta?.mensagemBoasVindas ?? '');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         clearToken();
@@ -41,15 +53,14 @@ export default function MarcaPage() {
 
   async function enviarLogo(file: File) {
     setEnviando(true);
-    setMsg('');
     try {
       const path = await uploadArquivo('imagens', file);
       // salva o caminho; o /me devolve uma URL assinada para exibir
       await api('/painel/marca', { method: 'PATCH', body: JSON.stringify({ logoUrl: path }) });
-      setMsg('Logo atualizado.');
+      toast.success('Logo atualizado.');
       await carregar();
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Erro ao enviar logo');
+      toast.error(err instanceof Error ? err.message : 'Erro ao enviar logo');
     } finally {
       setEnviando(false);
     }
@@ -57,14 +68,28 @@ export default function MarcaPage() {
 
   async function salvarCor() {
     setSalvando(true);
-    setMsg('');
     try {
       await api('/painel/marca', { method: 'PATCH', body: JSON.stringify({ corPrimaria: cor }) });
-      setMsg('Cor salva.');
+      toast.success('Cor salva.');
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Erro ao salvar');
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function salvarBoasVindas() {
+    setSalvandoBv(true);
+    try {
+      await api('/painel/marca', {
+        method: 'PATCH',
+        body: JSON.stringify({ boasVindasAtivo: bvAtivo, mensagemBoasVindas: bvMsg }),
+      });
+      toast.success('Boas-vindas salvas.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
+    } finally {
+      setSalvandoBv(false);
     }
   }
 
@@ -75,7 +100,6 @@ export default function MarcaPage() {
           <h1 className="text-2xl font-bold">Marca</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">Logo e cor exibidos na área dos seus alunos e nos certificados.</p>
         </div>
-        {msg && <p className="text-sm text-tribo-600 dark:text-tribo-400">{msg}</p>}
 
         {/* Preview */}
         <div className="rounded-2xl text-white p-6" style={{ background: `linear-gradient(to right, #0f172a, ${cor})` }}>
@@ -96,7 +120,7 @@ export default function MarcaPage() {
         </div>
 
         {/* Logo */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+        <div className="ui-card p-5">
           <p className="font-semibold mb-3">Logo</p>
           <input
             ref={fileRef}
@@ -119,14 +143,14 @@ export default function MarcaPage() {
         </div>
 
         {/* Cor */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+        <div className="ui-card p-5">
           <p className="font-semibold mb-3">Cor primária</p>
           <div className="flex items-center gap-3">
             <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="w-12 h-10 rounded border border-slate-300 dark:border-slate-600" />
             <input
               value={cor}
               onChange={(e) => setCor(e.target.value)}
-              className="w-32 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-32 ui-input"
             />
             <button
               onClick={salvarCor}
@@ -136,6 +160,28 @@ export default function MarcaPage() {
               {salvando ? 'Salvando...' : 'Salvar cor'}
             </button>
           </div>
+        </div>
+
+        {/* Modal de boas-vindas */}
+        <div className="ui-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold">Mensagem de boas-vindas</p>
+              <p className="text-xs text-slate-400">Exibida em um modal quando o aluno entra na área de membros.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={bvAtivo} onChange={(e) => setBvAtivo(e.target.checked)} />
+              {bvAtivo ? 'Ativada' : 'Desativada'}
+            </label>
+          </div>
+          <RichTextField value={bvMsg} onChange={setBvMsg} placeholder="Mensagem de boas-vindas (opcional)" />
+          <button
+            onClick={salvarBoasVindas}
+            disabled={salvandoBv}
+            className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+          >
+            {salvandoBv ? 'Salvando...' : 'Salvar boas-vindas'}
+          </button>
         </div>
       </div>
     </Shell>

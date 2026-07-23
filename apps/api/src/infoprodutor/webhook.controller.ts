@@ -53,6 +53,18 @@ export class WebhookController {
     return this.webhook.eduzz(contaId, token ?? header ?? body?.token, body);
   }
 
+  // Checkout Efí (via middleware do produtor). Caminho distinto de /webhooks/efi[/pix]
+  // (esses são do billing da assinatura). Segurança por HMAC no header x-efi-assinatura.
+  @Post('webhooks/efi-produto/:contaId')
+  @HttpCode(200)
+  efi(
+    @Param('contaId') contaId: string,
+    @Headers('x-efi-assinatura') assinatura: string,
+    @Body() body: any,
+  ) {
+    return this.webhook.efi(contaId, assinatura, body);
+  }
+
   // Cron protegido por segredo — expira matrículas vencidas.
   @Post('internal/matriculas/expirar')
   @HttpCode(200)

@@ -74,7 +74,7 @@ export default function MenuLinksPage() {
 
         <form
           onSubmit={adicionar}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 mb-6"
+          className="ui-card p-5 mb-6"
         >
           <div className="grid sm:grid-cols-[1fr_1.5fr_auto] gap-3 items-end">
             <div>
@@ -85,7 +85,7 @@ export default function MenuLinksPage() {
                 required
                 maxLength={60}
                 placeholder="Ex.: Supabase"
-                className="w-full mt-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+                className="w-full mt-1 ui-input"
               />
             </div>
             <div>
@@ -95,7 +95,7 @@ export default function MenuLinksPage() {
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
                 required
                 placeholder="https://app.supabase.com/..."
-                className="w-full mt-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm"
+                className="w-full mt-1 ui-input"
               />
             </div>
             <button
@@ -109,7 +109,7 @@ export default function MenuLinksPage() {
           {erro && <p className="text-sm text-rose-600 mt-3">{erro}</p>}
         </form>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+        <div className="ui-card divide-y divide-slate-100 dark:divide-slate-700">
           {carregando ? (
             <p className="px-5 py-4 text-slate-500 text-sm">Carregando...</p>
           ) : links.length === 0 ? (

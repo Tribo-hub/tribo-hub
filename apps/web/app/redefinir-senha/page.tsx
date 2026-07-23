@@ -75,7 +75,7 @@ export default function RedefinirSenhaPage() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+                className="w-full ui-input dark:text-white mt-1"
               />
             </div>
             <div>
@@ -85,7 +85,7 @@ export default function RedefinirSenhaPage() {
                 value={confirma}
                 onChange={(e) => setConfirma(e.target.value)}
                 required
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm mt-1"
+                className="w-full ui-input dark:text-white mt-1"
               />
             </div>
             <button

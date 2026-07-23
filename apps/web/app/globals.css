@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Design system — tokens centralizados (editar aqui reflete em todo o app) */
+@layer components {
+  .ui-card { @apply bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700; }
+  .ui-input { @apply border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2 text-sm; }
+}
+
+/* Barra de rolagem horizontal sempre visível e fininha (régua da jornada) */
+.scroll-x-visivel { overflow-x: scroll; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.dark .scroll-x-visivel { scrollbar-color: #475569 transparent; }
+.scroll-x-visivel::-webkit-scrollbar { height: 8px; }
+.scroll-x-visivel::-webkit-scrollbar-track { background: transparent; }
+.scroll-x-visivel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.dark .scroll-x-visivel::-webkit-scrollbar-thumb { background: #475569; }
+
+/* Conteúdo rico das aulas (HTML produzido pelo infoprodutor) */
+.prose-conteudo h1 { font-size: 1.5rem; font-weight: 700; margin: 0.6em 0 0.3em; }
+.prose-conteudo h2 { font-size: 1.25rem; font-weight: 700; margin: 0.6em 0 0.3em; }
+.prose-conteudo h3 { font-size: 1.1rem; font-weight: 600; margin: 0.6em 0 0.3em; }
+.prose-conteudo p { margin: 0.4em 0; }
+.prose-conteudo ul { list-style: disc; padding-left: 1.5em; margin: 0.4em 0; }
+.prose-conteudo ol { list-style: decimal; padding-left: 1.5em; margin: 0.4em 0; }
+.prose-conteudo a { color: #7c3aed; text-decoration: underline; }
+.prose-conteudo blockquote { border-left: 3px solid #94a3b8; padding-left: 0.8em; margin: 0.5em 0; color: inherit; opacity: 0.85; }
+.prose-conteudo strong { font-weight: 700; }
+.prose-conteudo em { font-style: italic; }
