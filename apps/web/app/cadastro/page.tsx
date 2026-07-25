@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, setSessao } from '../../lib/api';
+import { tenantDoHost } from '../../lib/tenant';
+import { useMarcaPublica } from '../../lib/useMarcaPublica';
+import { MarcaHeader } from '../../components/MarcaHeader';
 
 interface SignupResponse {
   accessToken: string;
@@ -13,6 +16,8 @@ interface SignupResponse {
 
 export default function CadastroPage() {
   const router = useRouter();
+  const { marca } = useMarcaPublica();
+  const temHost = typeof window !== 'undefined' && !!tenantDoHost(); // já estamos num subdomínio?
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -48,10 +53,7 @@ export default function CadastroPage() {
         onSubmit={onSubmit}
         className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-7 space-y-4"
       >
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-tribo-600 grid place-items-center text-white font-bold">T</div>
-          <span className="font-bold text-lg text-slate-900 dark:text-white">Tribo Hub</span>
-        </div>
+        <MarcaHeader marca={marca} />
         <h1 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Criar conta</h1>
 
         {erro && (
@@ -87,20 +89,23 @@ export default function CadastroPage() {
             className="w-full ui-input dark:text-white mt-1"
           />
         </div>
-        <div>
-          <label className="text-xs text-slate-500 dark:text-slate-400">Código da sua conta</label>
-          <input
-            type="text"
-            value={tenant}
-            onChange={(e) => setTenant(e.target.value)}
-            placeholder="ex.: academia-do-trafego"
-            className="w-full ui-input dark:text-white mt-1"
-          />
-          <p className="text-[11px] text-slate-400 mt-1">Informe o código da área de membros onde você vai estudar.</p>
-        </div>
+        {!temHost && (
+          <div>
+            <label className="text-xs text-slate-500 dark:text-slate-400">Código da sua conta</label>
+            <input
+              type="text"
+              value={tenant}
+              onChange={(e) => setTenant(e.target.value)}
+              placeholder="ex.: academia-do-trafego"
+              className="w-full ui-input dark:text-white mt-1"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">Informe o código da área de membros onde você vai estudar.</p>
+          </div>
+        )}
         <button
           type="submit"
           disabled={carregando}
+          style={marca?.corPrimaria ? { backgroundColor: marca.corPrimaria } : undefined}
           className="w-full bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition"
         >
           {carregando ? 'Criando...' : 'Criar conta'}

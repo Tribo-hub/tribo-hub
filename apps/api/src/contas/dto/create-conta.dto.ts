@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -54,6 +55,15 @@ export class UpdateContaDto {
   @IsOptional()
   @IsString()
   corPrimaria?: string;
+
+  // Subdomínio da área de membros (ex.: "vendas" -> vendas.tribohub.com.br).
+  // Só letras minúsculas, números e hífen; 2 a 63 caracteres (limite de rótulo DNS).
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/, {
+    message: 'Subdomínio inválido: use apenas letras minúsculas, números e hífen (2 a 63 caracteres).',
+  })
+  subdominio?: string;
 
   @IsOptional()
   @IsBoolean()

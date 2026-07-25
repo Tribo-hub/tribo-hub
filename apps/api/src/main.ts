@@ -11,9 +11,26 @@ async function bootstrap() {
   initSentry();
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
-  // Origens permitidas: domínio de marca (APP_URL) + fallback do Pages durante a transição
-  const origensCors = [...new Set([env.APP_URL, 'https://tribohub.pages.dev'])];
-  app.enableCors({ origin: origensCors, credentials: true });
+  // Origens permitidas: domínio de marca (APP_URL), fallback do Pages e QUALQUER
+  // subdomínio do domínio base (área de membros por cliente: vendas.tribohub.com.br).
+  const origensFixas = new Set([env.APP_URL, 'https://tribohub.pages.dev']);
+  const sufixoSub = `.${env.APP_BASE_DOMAIN}`; // ex.: ".tribohub.com.br"
+  app.enableCors({
+    credentials: true,
+    origin(origin, cb) {
+      // requests sem Origin (curl, server-to-server, webhooks) passam
+      if (!origin) return cb(null, true);
+      if (origensFixas.has(origin)) return cb(null, true);
+      try {
+        const host = new URL(origin).hostname;
+        // subdomínio do domínio base (qualquer cliente) — inclui o próprio domínio base
+        if (host === env.APP_BASE_DOMAIN || host.endsWith(sufixoSub)) return cb(null, true);
+      } catch {
+        /* origin malformado */
+      }
+      return cb(new Error('Origem não permitida pelo CORS'), false);
+    },
+  });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),

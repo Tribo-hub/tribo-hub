@@ -23,6 +23,7 @@ interface Conta {
   nome: string;
   tipoConta: 'corporativo' | 'infoprodutor';
   slug: string;
+  subdominio: string;
   ativo: boolean;
   permiteAutoCadastro: boolean;
   permiteComentarios: boolean;
@@ -59,12 +60,15 @@ export default function ContaDetalhe() {
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [msg, setMsg] = useState('');
   const [form, setForm] = useState({ plano: '', valorBase: '', limiteUsuarios: '', alunosIncluidos: '', valorPorExcedente: '' });
+  const [subdominio, setSubdominio] = useState('');
+  const [salvandoSub, setSalvandoSub] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!id) return;
     try {
       const c = await api<Conta>(`/admin/contas/${id}`);
       setConta(c);
+      setSubdominio(c.subdominio ?? c.slug ?? '');
       if (c.assinatura) {
         setForm({
           plano: c.assinatura.plano ?? '',
@@ -106,6 +110,27 @@ export default function ContaDetalhe() {
       setMsg('Plano atualizado.');
       await carregar();
     } catch (err) { setMsg(err instanceof Error ? err.message : 'Erro'); }
+  }
+
+  async function salvarSubdominio(e: React.FormEvent) {
+    e.preventDefault();
+    const sub = subdominio.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(sub)) {
+      toast.error('Use apenas letras minúsculas, números e hífen (2 a 63 caracteres).');
+      return;
+    }
+    if (conta && sub === (conta.subdominio ?? conta.slug)) return;
+    if (!confirm(`Alterar o endereço para ${sub}.tribohub.com.br? O endereço anterior deixará de funcionar.`)) return;
+    setSalvandoSub(true);
+    try {
+      await api(`/admin/contas/${id}`, { method: 'PATCH', body: JSON.stringify({ subdominio: sub }) });
+      toast.success('Endereço atualizado.');
+      await carregar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar o endereço');
+    } finally {
+      setSalvandoSub(false);
+    }
   }
 
   async function alternarStatus() {
@@ -168,6 +193,34 @@ export default function ContaDetalhe() {
             {conta.ativo ? 'Suspender conta' : 'Reativar conta'}
           </button>
         </div>
+
+        {/* Endereço da área de membros (subdomínio) */}
+        <form onSubmit={salvarSubdominio} className="ui-card p-5 space-y-3">
+          <div>
+            <p className="font-semibold">Endereço da área de membros</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              O subdomínio onde os alunos acessam esta conta. Deve ser único.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <input
+              value={subdominio}
+              onChange={(e) => setSubdominio(e.target.value)}
+              placeholder="ex.: vendas"
+              className="flex-1 min-w-0 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2"
+            />
+            <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">.tribohub.com.br</span>
+            <button
+              disabled={salvandoSub}
+              className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold px-4 py-2 rounded-lg whitespace-nowrap"
+            >
+              {salvandoSub ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            O endereço também é o código da conta usado no login/cadastro. Alterá-lo desativa o endereço anterior.
+          </p>
+        </form>
 
         {/* Auto-cadastro (somente infoprodutor) */}
         {ehInfo && (

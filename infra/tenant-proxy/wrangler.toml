@@ -1,0 +1,16 @@
+name = "tribohub-tenant-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Serve o app estático (Pages) em qualquer subdomínio de cliente.
+# A rota casa TODOS os subdomínios do domínio base; o worker trata api.* à parte.
+routes = [
+  { pattern = "*.tribohub.com.br/*", zone_name = "tribohub.com.br" },
+]
+
+[vars]
+BASE_DOMAIN = "tribohub.com.br"
+PAGES_ORIGIN = "tribohub.pages.dev"
+# Origem real da API no Railway (Settings → Networking → Public Domain, o *.up.railway.app).
+# Necessária porque a rota *.tribohub.com.br/* também casa api.* — o worker reencaminha.
+API_ORIGIN = "TROCAR-pela-origem.up.railway.app"

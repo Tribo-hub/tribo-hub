@@ -136,9 +136,32 @@ export class ContasService {
     return conta;
   }
 
+  // Subdomínios reservados para funções da plataforma — nunca podem ser de um cliente.
+  private static readonly SUBDOMINIOS_RESERVADOS = new Set([
+    'admin', 'app', 'www', 'api', 'docs', 'status', 'mail', 'email', 'assets', 'cdn', 'ssl',
+  ]);
+
   async atualizar(id: string, dto: UpdateContaDto) {
     await this.obter(id);
-    return this.prisma.conta.update({ where: { id }, data: dto });
+
+    // O subdomínio é o "código" público da conta: mantemos slug === subdominio
+    // (o TenantMiddleware resolve o tenant pelo rótulo do subdomínio e busca por slug).
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.subdominio !== undefined) {
+      const sub = dto.subdominio.trim().toLowerCase();
+      if (ContasService.SUBDOMINIOS_RESERVADOS.has(sub)) {
+        throw new ConflictException(`"${sub}" é um subdomínio reservado da plataforma.`);
+      }
+      const emUso = await this.prisma.conta.findFirst({
+        where: { OR: [{ subdominio: sub }, { slug: sub }], NOT: { id } },
+        select: { id: true },
+      });
+      if (emUso) throw new ConflictException(`O subdomínio "${sub}" já está em uso.`);
+      data.subdominio = sub;
+      data.slug = sub;
+    }
+
+    return this.prisma.conta.update({ where: { id }, data });
   }
 
   // Métricas agregadas de uma conta (Super Admin).

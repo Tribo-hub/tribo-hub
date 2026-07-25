@@ -21,6 +21,7 @@ import { HealthController } from './health/health.controller';
 import { InfoprodutorModule } from './infoprodutor/infoprodutor.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
 import { PlanosModule } from './planos/planos.module';
+import { PublicoModule } from './publico/publico.module';
 import { StorageModule } from './storage/storage.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -47,6 +48,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     GamificacaoModule,
     EquipeModule,
     JornadaModule,
+    PublicoModule,
   ],
   controllers: [HealthController],
   providers: [

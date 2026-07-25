@@ -1,4 +1,13 @@
+import { tenantDoHost } from './tenant';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
+
+// Header que informa à API qual tenant (área de membros) está sendo acessado,
+// derivado do subdomínio. Vazio em app.tribohub.com.br / dev.
+function tenantHeader(): Record<string, string> {
+  const slug = tenantDoHost();
+  return slug ? { 'X-Tenant-Slug': slug } : {};
+}
 
 const TOKEN_KEY = 'tribo_token';
 const REFRESH_KEY = 'tribo_refresh';
@@ -71,6 +80,7 @@ export async function api<T = unknown>(
     ...opts,
     headers: {
       'Content-Type': 'application/json',
+      ...tenantHeader(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(opts.headers || {}),
     },
