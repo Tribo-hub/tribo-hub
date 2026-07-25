@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { tenantDoHost } from '../../lib/tenant';
+import { temTenantPorHost } from '../../lib/tenant';
 import { useMarcaPublica } from '../../lib/useMarcaPublica';
 import { MarcaHeader } from '../../components/MarcaHeader';
 
 export default function EsqueciSenhaPage() {
   const { marca } = useMarcaPublica();
-  const temHost = typeof window !== 'undefined' && !!tenantDoHost();
+  const temHost = typeof window !== 'undefined' && temTenantPorHost();
   const [email, setEmail] = useState('');
   const [tenant, setTenant] = useState('');
   const [enviado, setEnviado] = useState(false);

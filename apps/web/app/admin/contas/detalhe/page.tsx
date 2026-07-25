@@ -24,6 +24,7 @@ interface Conta {
   tipoConta: 'corporativo' | 'infoprodutor';
   slug: string;
   subdominio: string;
+  dominioProprio: string | null;
   ativo: boolean;
   permiteAutoCadastro: boolean;
   permiteComentarios: boolean;
@@ -62,6 +63,8 @@ export default function ContaDetalhe() {
   const [form, setForm] = useState({ plano: '', valorBase: '', limiteUsuarios: '', alunosIncluidos: '', valorPorExcedente: '' });
   const [subdominio, setSubdominio] = useState('');
   const [salvandoSub, setSalvandoSub] = useState(false);
+  const [dominio, setDominio] = useState('');
+  const [salvandoDom, setSalvandoDom] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -69,6 +72,7 @@ export default function ContaDetalhe() {
       const c = await api<Conta>(`/admin/contas/${id}`);
       setConta(c);
       setSubdominio(c.subdominio ?? c.slug ?? '');
+      setDominio(c.dominioProprio ?? '');
       if (c.assinatura) {
         setForm({
           plano: c.assinatura.plano ?? '',
@@ -130,6 +134,27 @@ export default function ContaDetalhe() {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar o endereço');
     } finally {
       setSalvandoSub(false);
+    }
+  }
+
+  async function salvarDominio(e: React.FormEvent) {
+    e.preventDefault();
+    const dom = dominio.trim().toLowerCase();
+    const atual = conta?.dominioProprio ?? '';
+    if (dom === atual) return;
+    if (dom && !/^(?!-)[a-z0-9-]{1,63}(?:\.(?!-)[a-z0-9-]{1,63})+$/.test(dom)) {
+      toast.error('Domínio inválido. Ex.: area.seudominio.com.br (sem http:// e sem barra).');
+      return;
+    }
+    setSalvandoDom(true);
+    try {
+      await api(`/admin/contas/${id}`, { method: 'PATCH', body: JSON.stringify({ dominioProprio: dom }) });
+      toast.success(dom ? 'Domínio salvo. Conclua a configuração no Cloudflare Pages.' : 'Domínio removido.');
+      await carregar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar o domínio');
+    } finally {
+      setSalvandoDom(false);
     }
   }
 
@@ -220,6 +245,43 @@ export default function ContaDetalhe() {
           <p className="text-[11px] text-slate-400">
             O endereço também é o código da conta usado no login/cadastro. Alterá-lo desativa o endereço anterior.
           </p>
+        </form>
+
+        {/* Domínio próprio do cliente (Fase 2) */}
+        <form onSubmit={salvarDominio} className="ui-card p-5 space-y-3">
+          <div>
+            <p className="font-semibold">Domínio próprio (opcional)</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Endereço no domínio do próprio cliente, ex.: <code>area.tribodevendas.com.br</code>.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <input
+              value={dominio}
+              onChange={(e) => setDominio(e.target.value)}
+              placeholder="area.seudominio.com.br (vazio = remover)"
+              className="flex-1 min-w-0 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg px-3 py-2"
+            />
+            <button
+              disabled={salvandoDom}
+              className="bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold px-4 py-2 rounded-lg whitespace-nowrap"
+            >
+              {salvandoDom ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+          {conta.dominioProprio && (
+            <div className="text-xs bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-1">
+              <p className="font-semibold text-slate-600 dark:text-slate-300">Para ativar (uma vez):</p>
+              <p className="text-slate-500 dark:text-slate-400">
+                1. No Cloudflare Pages (projeto <code>tribohub</code>) → Custom domains → adicionar{' '}
+                <code>{conta.dominioProprio}</code>.
+              </p>
+              <p className="text-slate-500 dark:text-slate-400">
+                2. O cliente cria no DNS dele: <code>CNAME {conta.dominioProprio} → tribohub.pages.dev</code>.
+              </p>
+              <p className="text-slate-500 dark:text-slate-400">3. Aguardar o status ficar <b>Active</b> (SSL automático).</p>
+            </div>
+          )}
         </form>
 
         {/* Auto-cadastro (somente infoprodutor) */}

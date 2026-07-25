@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { salvarMarca } from './marca';
-import { tenantDoHost } from './tenant';
+import { hostCustom, salvarSlugCustom, tenantDoHost } from './tenant';
 
 export interface MarcaPublica {
   slug: string;
@@ -21,17 +21,25 @@ export function useMarcaPublica(): { marca: MarcaPublica | null; carregando: boo
   const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
-    if (!tenantDoHost()) return; // domínio base / dev: sem marca por host
+    const custom = hostCustom(); // domínio próprio (Fase 2)
+    const sub = tenantDoHost(); // subdomínio da plataforma (Fase 1)
+    if (!custom && !sub) return; // domínio base / dev: sem marca por host
+
+    // No domínio próprio o slug ainda não é conhecido — resolve por ?host=.
+    // No subdomínio, o header X-Tenant-Slug (injetado pelo client) já identifica.
+    const url = custom ? `/publico/marca?host=${encodeURIComponent(custom)}` : '/publico/marca';
+
     let vivo = true;
     setCarregando(true);
-    api<MarcaPublica>('/publico/marca')
+    api<MarcaPublica>(url)
       .then((m) => {
         if (!vivo) return;
         setMarca(m);
         salvarMarca(m); // aquece o cache usado no app após o login
+        if (custom) salvarSlugCustom(custom, m.slug); // próximos requests já mandam X-Tenant-Slug
       })
       .catch(() => {
-        /* subdomínio sem conta ativa: mantém marca padrão */
+        /* endereço sem conta ativa: mantém marca padrão */
       })
       .finally(() => vivo && setCarregando(false));
     return () => {

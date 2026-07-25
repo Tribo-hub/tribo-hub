@@ -1,8 +1,9 @@
 # Área de membros por cliente — subdomínio e domínio próprio
 
-Como cada cliente tem seu próprio endereço (ex.: `vendas.tribohub.com.br`) em vez de
-todos usarem `app.tribohub.com.br`. Fase 1 (subdomínio) está implementada; Fase 2
-(domínio próprio do cliente) está desenhada ao final.
+Como cada cliente tem seu próprio endereço (ex.: `vendas.tribohub.com.br` ou o domínio
+próprio `area.cliente.com`) em vez de todos usarem `app.tribohub.com.br`. Fase 1
+(subdomínio) e Fase 2 nível 1 (domínio próprio via custom domain no Pages) estão
+implementadas; o self-service automático (Fase 2 nível 2) está desenhado ao final.
 
 ## Como funciona (arquitetura)
 
@@ -74,20 +75,45 @@ mas confira que `www.` e o site de marketing não sejam capturados indevidamente
 
 ---
 
-## Fase 2 — domínio próprio do cliente (`area.cliente.com`) — desenho
+## Fase 2 — domínio próprio do cliente (`area.cliente.com`)
 
-Ainda não implementado. O `dominioProprio` já existe no schema e o middleware já resolve
-tenant por ele. Falta:
+Endereço no domínio do PRÓPRIO cliente, ex.: `area.tribodevendas.com.br`.
 
-1. **SSL para domínios de terceiros** → **Cloudflare for SaaS (Custom Hostnames)**. O
-   cliente aponta `CNAME area.cliente.com → ssl.tribohub.com.br` (fallback origin) e a
-   Cloudflare emite o certificado automaticamente.
-2. **Front**: ao detectar hostname fora de `*.tribohub.com.br`, chamar
-   `GET /api/publico/marca?host=area.cliente.com` para descobrir o slug e então enviar
-   `X-Tenant-Slug` normalmente (o endpoint já aceita `?host=`).
-3. **UI do produtor** (`admin_tenant`): tela para cadastrar o domínio, ver instruções de
-   DNS e status de verificação (TXT).
-4. **API**: endpoint para salvar `dominioProprio` + verificação por registro DNS.
+### Nível 1 — MVP (implementado)
 
-O mecanismo de tenant (header `X-Tenant-Slug`) é o mesmo — só muda como o front descobre
-o slug quando o hostname não é um subdomínio da plataforma.
+Usa o mesmo mecanismo da Fase 1: **custom domain no Pages** (funciona para subdomínio de
+domínio externo — o cliente cria um CNAME e a Cloudflare emite o SSL). Sem Cloudflare for
+SaaS, sem token de API.
+
+Código (já no ar):
+- `contas.service.ts` + DTO: super-admin grava/limpa `dominioProprio` (unicidade; bloqueia
+  domínios `*.tribohub.com.br`, que vão no campo de subdomínio).
+- `main.ts`: CORS libera dinamicamente origens de `dominioProprio` cadastrados (lookup + cache 60s).
+- `lib/tenant.ts`: `hostCustom()` detecta domínio próprio; o slug é resolvido via
+  `GET /publico/marca?host=...` e memorizado (`salvarSlugCustom`) para os próximos requests
+  mandarem `X-Tenant-Slug`.
+- `useMarcaPublica`: no domínio próprio busca a marca por `?host=` (nome/cor/logo antes do login).
+- Super-admin → detalhe da conta: card **Domínio próprio** com as instruções de CNAME.
+
+Operação (por cliente):
+1. Super-admin → Contas → conta → card **Domínio próprio** → salvar `area.cliente.com`.
+2. Cloudflare → projeto Pages **`tribohub`** → Custom domains → adicionar `area.cliente.com`.
+3. Cliente cria no DNS dele: `CNAME area.cliente.com → tribohub.pages.dev`.
+4. Aguardar status **Active** (SSL automático) e testar.
+
+> Domínio RAIZ (`cliente.com` sem subdomínio) não funciona por este caminho — o Pages exige
+> que o apex esteja na sua conta Cloudflare. Para apex, use o Nível 2.
+
+### Nível 2 — self-service automático (não implementado)
+
+Para o produtor cadastrar o próprio domínio no painel dele **sem você tocar na Cloudflare**
+(e suportar domínio raiz), via **Cloudflare for SaaS (Custom Hostnames)**:
+
+1. Habilitar Cloudflare for SaaS na zona + definir um **fallback origin** que sirva o app.
+2. **Token de API** da Cloudflare (env) + integração com a API de custom hostnames
+   (criar/checar/remover) no backend.
+3. Verificação de propriedade + SSL por registro DNS (status pendente/ativo).
+4. UI no painel do produtor (`admin_tenant`) para cadastrar o domínio e ver o status.
+
+Preço: 100 custom hostnames grátis, US$ 0,10/hostname/mês depois (ver `MEMORY`/pesquisa).
+O mecanismo de tenant (header `X-Tenant-Slug`) permanece o mesmo — muda só o provisionamento.

@@ -6,29 +6,54 @@ import { env } from '@tribohub/config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/observability';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
   initSentry();
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
-  // Origens permitidas: domínio de marca (APP_URL), fallback do Pages e QUALQUER
-  // subdomínio do domínio base (área de membros por cliente: vendas.tribohub.com.br).
+  // Origens permitidas:
+  //  - domínio de marca (APP_URL) e fallback do Pages;
+  //  - QUALQUER subdomínio do domínio base (vendas.tribohub.com.br) — Fase 1;
+  //  - domínios PRÓPRIOS de cliente cadastrados em Conta.dominioProprio — Fase 2 (lookup + cache).
+  const prisma = app.get(PrismaService);
   const origensFixas = new Set([env.APP_URL, 'https://tribohub.pages.dev']);
   const sufixoSub = `.${env.APP_BASE_DOMAIN}`; // ex.: ".tribohub.com.br"
+  const cacheDom = new Map<string, { ok: boolean; exp: number }>(); // host -> permitido?
+  const DOM_TTL = 60_000;
+
+  async function dominioProprioValido(host: string): Promise<boolean> {
+    const c = cacheDom.get(host);
+    if (c && c.exp > Date.now()) return c.ok;
+    let ok = false;
+    try {
+      const conta = await prisma.conta.findUnique({ where: { dominioProprio: host }, select: { ativo: true } });
+      ok = !!conta?.ativo;
+    } catch {
+      ok = false;
+    }
+    cacheDom.set(host, { ok, exp: Date.now() + DOM_TTL });
+    return ok;
+  }
+
   app.enableCors({
     credentials: true,
     origin(origin, cb) {
       // requests sem Origin (curl, server-to-server, webhooks) passam
       if (!origin) return cb(null, true);
       if (origensFixas.has(origin)) return cb(null, true);
+      let host: string;
       try {
-        const host = new URL(origin).hostname;
-        // subdomínio do domínio base (qualquer cliente) — inclui o próprio domínio base
-        if (host === env.APP_BASE_DOMAIN || host.endsWith(sufixoSub)) return cb(null, true);
+        host = new URL(origin).hostname;
       } catch {
-        /* origin malformado */
+        return cb(new Error('Origem não permitida pelo CORS'), false);
       }
-      return cb(new Error('Origem não permitida pelo CORS'), false);
+      // subdomínio do domínio base (qualquer cliente) — inclui o próprio domínio base
+      if (host === env.APP_BASE_DOMAIN || host.endsWith(sufixoSub)) return cb(null, true);
+      // domínio próprio de cliente (Fase 2)
+      dominioProprioValido(host).then((ok) =>
+        ok ? cb(null, true) : cb(new Error('Origem não permitida pelo CORS'), false),
+      );
     },
   });
   app.setGlobalPrefix('api');

@@ -65,6 +65,17 @@ export class UpdateContaDto {
   })
   subdominio?: string;
 
+  // Domínio próprio do cliente (ex.: "area.tribodevendas.com.br"). String vazia limpa.
+  // Aceita hostname (rótulos separados por ponto); validação leve — o vínculo real
+  // é feito ao adicionar o custom domain no Cloudflare Pages.
+  @IsOptional()
+  @IsString()
+  @MaxLength(253)
+  @Matches(/^$|^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/, {
+    message: 'Domínio inválido. Ex.: area.seudominio.com.br (sem http:// e sem barra).',
+  })
+  dominioProprio?: string;
+
   @IsOptional()
   @IsBoolean()
   permiteAutoCadastro?: boolean;

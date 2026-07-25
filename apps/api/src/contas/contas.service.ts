@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { env } from '@tribohub/config';
 import { Role, TipoCobranca, TipoConta } from '@tribohub/db';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../auth/auth.service';
@@ -159,6 +160,24 @@ export class ContasService {
       if (emUso) throw new ConflictException(`O subdomínio "${sub}" já está em uso.`);
       data.subdominio = sub;
       data.slug = sub;
+    }
+
+    // Domínio próprio (ex.: area.cliente.com). Vazio limpa; senão valida unicidade.
+    if (dto.dominioProprio !== undefined) {
+      const dom = dto.dominioProprio.trim().toLowerCase();
+      if (!dom) {
+        data.dominioProprio = null;
+      } else {
+        if (dom.endsWith(`.${env.APP_BASE_DOMAIN}`) || dom === env.APP_BASE_DOMAIN) {
+          throw new ConflictException('Para endereços em tribohub.com.br, use o campo de subdomínio.');
+        }
+        const emUso = await this.prisma.conta.findFirst({
+          where: { dominioProprio: dom, NOT: { id } },
+          select: { id: true },
+        });
+        if (emUso) throw new ConflictException(`O domínio "${dom}" já está vinculado a outra conta.`);
+        data.dominioProprio = dom;
+      }
     }
 
     return this.prisma.conta.update({ where: { id }, data });

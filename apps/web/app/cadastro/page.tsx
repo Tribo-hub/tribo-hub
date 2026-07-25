@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, setSessao } from '../../lib/api';
-import { tenantDoHost } from '../../lib/tenant';
+import { temTenantPorHost } from '../../lib/tenant';
 import { useMarcaPublica } from '../../lib/useMarcaPublica';
 import { MarcaHeader } from '../../components/MarcaHeader';
 
@@ -17,7 +17,7 @@ interface SignupResponse {
 export default function CadastroPage() {
   const router = useRouter();
   const { marca } = useMarcaPublica();
-  const temHost = typeof window !== 'undefined' && !!tenantDoHost(); // já estamos num subdomínio?
+  const temHost = typeof window !== 'undefined' && temTenantPorHost(); // subdomínio ou domínio próprio?
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');

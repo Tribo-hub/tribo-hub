@@ -1,11 +1,12 @@
-import { tenantDoHost } from './tenant';
+import { slugParaHeader } from './tenant';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
 
-// Header que informa à API qual tenant (área de membros) está sendo acessado,
-// derivado do subdomínio. Vazio em app.tribohub.com.br / dev.
+// Header que informa à API qual tenant (área de membros) está sendo acessado —
+// derivado do subdomínio (Fase 1) ou do domínio próprio já resolvido (Fase 2).
+// Vazio em app.tribohub.com.br / dev.
 function tenantHeader(): Record<string, string> {
-  const slug = tenantDoHost();
+  const slug = slugParaHeader();
   return slug ? { 'X-Tenant-Slug': slug } : {};
 }
 
