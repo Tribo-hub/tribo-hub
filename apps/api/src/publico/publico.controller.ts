@@ -1,5 +1,6 @@
 import { Controller, Get, NotFoundException, Query, Req } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 // Endpoints PÚBLICOS (sem autenticação) — servem a tela de login/cadastro do aluno
 // para exibir a marca do cliente ANTES do login, evitando o "flash" da marca padrão.
@@ -7,7 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 // dos parâmetros ?tenant= (slug) / ?host= (domínio próprio).
 @Controller('publico')
 export class PublicoController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Get('marca')
   async marca(
@@ -25,11 +29,21 @@ export class PublicoController {
 
     if (!conta || !conta.ativo) throw new NotFoundException('Conta não encontrada');
 
+    // logoUrl é um caminho no storage privado — assina uma URL de leitura (como o /me faz).
+    let logoUrl: string | null = conta.logoUrl;
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      try {
+        logoUrl = (await this.storage.urlDeDownload(logoUrl, 86_400)).url;
+      } catch {
+        logoUrl = null;
+      }
+    }
+
     return {
       slug: conta.slug,
       nome: conta.nome,
       corPrimaria: conta.corPrimaria,
-      logoUrl: conta.logoUrl,
+      logoUrl,
       tipoConta: conta.tipoConta,
       permiteAutoCadastro: conta.permiteAutoCadastro,
     };
