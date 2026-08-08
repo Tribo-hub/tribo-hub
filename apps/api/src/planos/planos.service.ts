@@ -329,6 +329,13 @@ export class PlanosService {
     const entregaMap = new Map(entregas.map((e) => [e.planoId, e]));
     const agora = Date.now();
 
+    // Capas assinadas em lote (com cache) — antes: 1 assinatura por plano.
+    const assinadoCapas = await this.storage.urlsDeDownload(
+      planos.map((p) => p.capaUrl).filter((c): c is string => !!c && !c.startsWith('http')),
+    );
+    const capa = (u: string | null): string | null =>
+      !u ? null : u.startsWith('http') ? u : (assinadoCapas.get(u) ?? null);
+
     return Promise.all(
       planos.map(async (p) => {
         const concluidos = p.itens.filter((i) => this.concluidoLocal(i, pmap, assistidos)).length;
@@ -342,7 +349,7 @@ export class PlanosService {
           ordem: p.ordem,
           trilhaId: p.trilhaId,
           trilhaTitulo: p.trilhaId ? trilhaNome.get(p.trilhaId) ?? null : null,
-          capaUrl: await this.assinarSeArquivo(p.capaUrl),
+          capaUrl: capa(p.capaUrl),
           prazoEm,
           releasedAt,
           bloqueado: !!releasedAt && releasedAt.getTime() > agora,

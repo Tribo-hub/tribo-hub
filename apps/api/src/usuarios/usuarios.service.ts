@@ -40,21 +40,17 @@ export class UsuariosService {
       },
     });
     if (!user) throw new NotFoundException('Usuário não encontrado');
-    // logo enviado ao Storage (caminho privado) -> assina p/ exibição; URL externa fica como está
-    if (user.conta?.logoUrl && !user.conta.logoUrl.startsWith('http')) {
-      try {
-        user.conta.logoUrl = (await this.storage.urlDeDownload(user.conta.logoUrl)).url;
-      } catch {
-        user.conta.logoUrl = null;
-      }
-    }
-    // avatar do aluno (caminho do Storage) -> assina p/ exibição
-    if (user.avatarUrl && !user.avatarUrl.startsWith('http')) {
-      try {
-        user.avatarUrl = (await this.storage.urlDeDownload(user.avatarUrl)).url;
-      } catch {
-        user.avatarUrl = null;
-      }
+    // logo e avatar (caminhos privados do Storage) -> assina p/ exibição em 1 lote com cache.
+    // (URL externa http fica como está.)
+    const aAssinar: string[] = [];
+    const logoPath = user.conta?.logoUrl && !user.conta.logoUrl.startsWith('http') ? user.conta.logoUrl : null;
+    const avatarPath = user.avatarUrl && !user.avatarUrl.startsWith('http') ? user.avatarUrl : null;
+    if (logoPath) aAssinar.push(logoPath);
+    if (avatarPath) aAssinar.push(avatarPath);
+    if (aAssinar.length) {
+      const assinado = await this.storage.urlsDeDownload(aAssinar).catch(() => new Map<string, string>());
+      if (logoPath && user.conta) user.conta.logoUrl = assinado.get(logoPath) ?? null;
+      if (avatarPath) user.avatarUrl = assinado.get(avatarPath) ?? null;
     }
 
     // Bloqueio por inadimplência (Fase 1): produtor a partir de 15d, aluno a partir de 30d.

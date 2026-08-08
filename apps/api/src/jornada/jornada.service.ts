@@ -16,22 +16,27 @@ export class JornadaService {
   ) {}
 
   async jornada(user: AuthUser, selParam?: string) {
-    const conta = await this.prisma.conta.findUnique({
-      where: { id: user.contaId! },
-      select: { agendaAtiva: true, planosAtivos: true },
-    });
-
-    // Trilhas do aluno (matrículas ativas) — alimentam o seletor.
-    const mats = await this.prisma.matricula.findMany({
-      where: {
-        usuarioId: user.sub,
-        contaId: user.contaId!,
-        status: StatusMatricula.ativa,
-        OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }],
-      },
-      select: { trilha: { select: { id: true, titulo: true } } },
-    });
+    // Independentes → em paralelo (dados da conta + matrículas ativas do aluno).
+    const [conta, mats] = await Promise.all([
+      this.prisma.conta.findUnique({
+        where: { id: user.contaId! },
+        select: { agendaAtiva: true, planosAtivos: true },
+      }),
+      this.prisma.matricula.findMany({
+        where: {
+          usuarioId: user.sub,
+          contaId: user.contaId!,
+          status: StatusMatricula.ativa,
+          OR: [{ expiraEm: null }, { expiraEm: { gte: new Date() } }],
+        },
+        select: { trilha: { select: { id: true, titulo: true } } },
+      }),
+    ]);
     const trilhas = [...new Map(mats.map((m) => [m.trilha.id, m.trilha])).values()];
+
+    // O resumo de gamificação é independente dos planos — dispara já e resolve depois,
+    // rodando em paralelo com meusPlanos (a query mais cara da home).
+    const resumoP = this.gamificacao.resumo(user).catch(() => null);
 
     // Planos do aluno (todos, já com status/percentual/bloqueio calculados).
     const planosTodos = conta?.planosAtivos ? await this.planos.meusPlanos(user) : [];
@@ -49,7 +54,7 @@ export class JornadaService {
     let sel = selParam && opcoes.some((o) => o.valor === selParam) ? selParam : '';
     if (!sel) sel = (opcoes.find((o) => o.temPlanos) ?? opcoes[0])?.valor ?? '';
 
-    const resumo = await this.gamificacao.resumo(user).catch(() => null);
+    const resumo = await resumoP;
     const gl = (resumo as { global?: { nivel: number; xp: number } } | null)?.global;
     const nivel = gl?.nivel ?? null;
     const xp = gl?.xp ?? null;

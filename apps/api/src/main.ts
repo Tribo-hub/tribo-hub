@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import compression from 'compression';
 import helmet from 'helmet';
 import { env } from '@tribohub/config';
 import { AppModule } from './app.module';
@@ -12,6 +13,7 @@ async function bootstrap() {
   initSentry();
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
+  app.use(compression()); // gzip/brotli — reduz o payload no transporte (API US ↔ Brasil)
   // Origens permitidas:
   //  - domínio de marca (APP_URL) e fallback do Pages;
   //  - QUALQUER subdomínio do domínio base (vendas.tribohub.com.br) — Fase 1;
