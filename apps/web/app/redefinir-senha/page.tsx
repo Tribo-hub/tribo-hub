@@ -4,9 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useMarcaPublica } from '../../lib/useMarcaPublica';
+import { MarcaHeader } from '../../components/MarcaHeader';
 
 export default function RedefinirSenhaPage() {
   const router = useRouter();
+  const { marca } = useMarcaPublica();
   const [token, setToken] = useState('');
   const [senha, setSenha] = useState('');
   const [confirma, setConfirma] = useState('');
@@ -44,10 +47,7 @@ export default function RedefinirSenhaPage() {
   return (
     <main className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-900 px-4">
       <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-7 space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-tribo-600 grid place-items-center text-white font-bold">T</div>
-          <span className="font-bold text-lg text-slate-900 dark:text-white">Tribo Hub</span>
-        </div>
+        <MarcaHeader marca={marca} />
 
         {ok ? (
           <>
@@ -91,6 +91,7 @@ export default function RedefinirSenhaPage() {
             <button
               type="submit"
               disabled={carregando}
+              style={marca?.corPrimaria ? { backgroundColor: marca.corPrimaria } : undefined}
               className="w-full bg-tribo-600 hover:bg-tribo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition"
             >
               {carregando ? 'Salvando...' : 'Redefinir senha'}

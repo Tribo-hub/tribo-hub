@@ -94,6 +94,14 @@ export default function LoginPage() {
         >
           Esqueci minha senha
         </Link>
+        {marca?.permiteAutoCadastro && (
+          <Link
+            href="/cadastro"
+            className="block text-center text-sm font-medium text-tribo-600 dark:text-tribo-400 hover:underline"
+          >
+            Criar conta
+          </Link>
+        )}
       </form>
     </main>
   );
