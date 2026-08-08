@@ -1,5 +1,5 @@
 # Worker fallback origin do Cloudflare for SaaS (domínio próprio do cliente).
-# Publicar na ZONA DEDICADA (troque tribohubapp.com pelo domínio que você registrar).
+# Zona dedicada: apptribohub.com.br.
 name = "tribohub-saas-proxy"
 main = "worker.js"
 compatibility_date = "2024-11-01"
@@ -7,7 +7,7 @@ compatibility_date = "2024-11-01"
 # Captura TODO o tráfego da zona dedicada — inclui os custom hostnames dos clientes.
 # Seguro porque esta zona não tem API nem site de marketing.
 routes = [
-  { pattern = "*/*", zone_name = "tribohubapp.com" },
+  { pattern = "*/*", zone_name = "apptribohub.com.br" },
 ]
 
 [vars]

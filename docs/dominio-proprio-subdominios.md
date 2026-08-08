@@ -108,7 +108,7 @@ Operação (por cliente):
 
 O produtor cadastra o próprio domínio no painel dele e a Cloudflare provisiona validação +
 SSL automaticamente — **sem trabalho manual da equipe**. Decisão de arquitetura: usar uma
-**ZONA DEDICADA** (ex.: `tribohubapp.com`) só para os custom hostnames, mantendo a zona
+**ZONA DEDICADA** (ex.: `apptribohub.com.br`) só para os custom hostnames, mantendo a zona
 principal (API, marketing, app) intocada.
 
 **Código (pronto, gated por env):**
@@ -121,18 +121,18 @@ principal (API, marketing, app) intocada.
 - Env: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_SAAS_TARGET`.
 
 **Runbook de ativação (uma vez):**
-1. Registrar um domínio dedicado (ex.: `tribohubapp.com`) e adicioná-lo como zona na Cloudflare.
+1. Registrar um domínio dedicado (ex.: `apptribohub.com.br`) e adicioná-lo como zona na Cloudflare.
 2. Nessa zona: **SSL/TLS → Custom Hostnames → habilitar Cloudflare for SaaS**.
-3. Criar um registro **A `origin` → `192.0.2.0`** (dummy, proxied) e definir `origin.tribohubapp.com`
+3. Criar um registro **A `origin` → `192.0.2.0`** (dummy, proxied) e definir `origin.apptribohub.com.br`
    como **fallback origin** do SaaS.
-4. Publicar o Worker: em `infra/saas-proxy/wrangler.toml` trocar `tribohubapp.com` pelo domínio
+4. Publicar o Worker: em `infra/saas-proxy/wrangler.toml` trocar `apptribohub.com.br` pelo domínio
    real, então `cd infra/saas-proxy && npx wrangler deploy` (rota `*/*` na zona dedicada).
 5. Criar um **token de API** (Cloudflare → My Profile → API Tokens) com permissão
    *Zone → SSL and Certificates → Edit* (ou *Custom Hostnames*) na zona dedicada.
 6. No Railway (serviço `tribo_hub`), setar as env: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`
-   (id da zona dedicada) e `CLOUDFLARE_SAAS_TARGET=origin.tribohubapp.com`. Deploy da API.
+   (id da zona dedicada) e `CLOUDFLARE_SAAS_TARGET=origin.apptribohub.com.br`. Deploy da API.
 7. Testar com um domínio real: no painel do produtor, cadastrar `area.<dominioteste>.com`,
-   criar o `CNAME → origin.tribohubapp.com` no DNS do domínio de teste, clicar **Verificar**
+   criar o `CNAME → origin.apptribohub.com.br` no DNS do domínio de teste, clicar **Verificar**
    até ficar **Ativo**, e acessar.
 
 **Custos:** 100 custom hostnames grátis, US$ 0,10/hostname/mês depois; Worker grátis até
