@@ -31,7 +31,7 @@ export default function ParceirosPage() {
 
   const carregar = useCallback(async () => {
     try { setParceiros(await api<Parceiro[]>('/admin/parceiros')); }
-    catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } }
+    catch (err) { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } }
   }, [router]);
 
   useEffect(() => { if (!getToken()) { router.replace('/login'); return; } carregar(); }, [router, carregar]);

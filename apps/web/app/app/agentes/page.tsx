@@ -28,7 +28,7 @@ export default function AgentesAlunoPage() {
       setAgentes(ags);
       setCor(me.conta?.corPrimaria || '#7c3aed');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

@@ -64,7 +64,7 @@ export default function DashboardPage() {
         setVendas(v);
       }
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

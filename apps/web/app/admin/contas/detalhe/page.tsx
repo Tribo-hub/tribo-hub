@@ -85,7 +85,7 @@ export default function ContaDetalhe() {
       setUsuarios(await api<Usuario[]>(`/admin/contas/${id}/usuarios`));
       setMetricas(await api<Metricas>(`/admin/contas/${id}/metricas`));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
         return;

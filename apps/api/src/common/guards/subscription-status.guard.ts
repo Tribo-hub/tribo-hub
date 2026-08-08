@@ -61,10 +61,13 @@ export class SubscriptionStatusGuard implements CanActivate {
     if (c && c.exp > Date.now()) return { painel: c.painel, alunos: c.alunos };
     const ass = await this.prisma.assinaturaPlataforma.findUnique({
       where: { contaId },
-      select: { painelBloqueado: true, alunosBloqueados: true },
+      select: { painelBloqueado: true, alunosBloqueados: true, trialAte: true },
     });
-    const painel = !!ass?.painelBloqueado;
-    const alunos = !!ass?.alunosBloqueados;
+    // Trial ativo (trialAte > agora) não cobra nem suspende — libera tudo, mesmo que os
+    // flags derivados ainda não tenham sido recalculados pela rotina de cobrança.
+    const emTrial = !!ass?.trialAte && ass.trialAte > new Date();
+    const painel = !emTrial && !!ass?.painelBloqueado;
+    const alunos = !emTrial && !!ass?.alunosBloqueados;
     this.cache.set(contaId, { painel, alunos, exp: Date.now() + this.TTL });
     return { painel, alunos };
   }

@@ -30,7 +30,7 @@ export default function ParceiroDetalhePage() {
 
   const carregar = useCallback(async (pid: string) => {
     try { setD(await api<Detalhe>(`/admin/parceiros/${pid}`)); }
-    catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } }
+    catch (err) { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } }
   }, [router]);
 
   useEffect(() => {

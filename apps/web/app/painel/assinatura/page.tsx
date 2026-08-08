@@ -62,7 +62,7 @@ export default function AssinaturaPage() {
   const carregar = () => {
     api<Assinatura>('/painel/assinatura')
       .then(setInfo)
-      .catch((err) => { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } });
+      .catch((err) => { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } });
     api<FaturaAberta | null>('/painel/minha-fatura-aberta').then(setAberta).catch(() => {});
     api<FaturaHist[]>('/painel/minhas-faturas').then(setFaturas).catch(() => {});
   };

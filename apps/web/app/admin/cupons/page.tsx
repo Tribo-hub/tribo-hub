@@ -29,7 +29,7 @@ export default function CuponsPage() {
 
   const carregar = useCallback(async () => {
     try { setCupons(await api<Cupom[]>('/admin/cupons')); }
-    catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } }
+    catch (err) { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } }
   }, [router]);
 
   useEffect(() => { if (!getToken()) { router.replace('/login'); return; } carregar(); }, [router, carregar]);

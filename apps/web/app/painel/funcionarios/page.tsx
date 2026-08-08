@@ -28,7 +28,7 @@ export default function FuncionariosPage() {
 
   const carregar = useCallback(async () => {
     try { setLista(await api<Funcionario[]>('/painel/funcionarios')); }
-    catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } }
+    catch (err) { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } }
   }, [router]);
 
   useEffect(() => { if (!getToken()) { router.replace('/login'); return; } carregar(); }, [router, carregar]);

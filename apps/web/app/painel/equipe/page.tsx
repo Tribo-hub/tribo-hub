@@ -34,7 +34,7 @@ export default function EquipePage() {
     try {
       setLista(await api<Colaborador[]>('/painel/colaboradores'));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

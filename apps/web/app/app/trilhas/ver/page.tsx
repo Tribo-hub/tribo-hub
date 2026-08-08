@@ -61,7 +61,7 @@ export default function TrilhaOverview() {
       setCor(m.conta?.corPrimaria || '#7c3aed');
       setAgentes(ags);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
         return;

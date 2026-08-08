@@ -39,7 +39,7 @@ export default function MarcaPage() {
       setBvAtivo(me.conta?.boasVindasAtivo ?? false);
       setBvMsg(me.conta?.mensagemBoasVindas ?? '');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

@@ -61,7 +61,7 @@ export default function AppHome() {
         } catch { setBoasVindas(m.conta.mensagemBoasVindas); }
       }
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); return; }
+      if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); return; }
       setErro(err instanceof Error ? err.message : 'Erro ao carregar');
     } finally { setCarregando(false); }
   }, [router]);

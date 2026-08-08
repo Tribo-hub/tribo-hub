@@ -57,7 +57,7 @@ export default function PlanosProdutorPage() {
       setPlanos(await api<PlanoResumo[]>('/painel/planos'));
       setTrilhas(await api<Trilha[]>('/painel/trilhas'));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

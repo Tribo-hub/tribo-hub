@@ -34,7 +34,7 @@ export default function DominioPage() {
       setEstado(s);
       setDominio(s.dominio ?? '');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

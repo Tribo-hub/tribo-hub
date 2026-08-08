@@ -56,7 +56,7 @@ export default function OfertasPage() {
       const integ = await api<{ plataforma: string }[]>('/painel/integracoes');
       setIntegracoes(integ.map((i) => i.plataforma));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }

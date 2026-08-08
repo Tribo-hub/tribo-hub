@@ -33,7 +33,7 @@ export default function FinanceiroPage() {
     try {
       setD(await api<Dashboard>(`/admin/financeiro/dashboard?competencia=${comp}`));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); }
+      if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); }
     }
   }, [router]);
 

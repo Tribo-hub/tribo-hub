@@ -24,7 +24,7 @@ export default function CertificadosPage() {
       api<{ conta?: { corPrimaria: string | null } }>('/me').then((m) => setCor(m.conta?.corPrimaria || '#7c3aed')).catch(() => {});
       setCerts(await api<Certificado[]>('/me/certificados'));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
         return;

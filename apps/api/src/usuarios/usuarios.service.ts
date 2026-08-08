@@ -58,13 +58,15 @@ export class UsuariosService {
     }
 
     // Bloqueio por inadimplência (Fase 1): produtor a partir de 15d, aluno a partir de 30d.
+    // Trial ativo (trialAte > agora) não bloqueia — consistente com o SubscriptionStatusGuard.
     let bloqueado = false;
     if (user.contaId && user.role !== 'super_admin') {
       const ass = await this.prisma.assinaturaPlataforma.findUnique({
         where: { contaId: user.contaId },
-        select: { painelBloqueado: true, alunosBloqueados: true },
+        select: { painelBloqueado: true, alunosBloqueados: true, trialAte: true },
       });
-      bloqueado = user.role === 'aluno' ? !!ass?.alunosBloqueados : !!ass?.painelBloqueado;
+      const emTrial = !!ass?.trialAte && ass.trialAte > new Date();
+      bloqueado = emTrial ? false : user.role === 'aluno' ? !!ass?.alunosBloqueados : !!ass?.painelBloqueado;
     }
     return { ...user, bloqueado };
   }

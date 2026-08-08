@@ -51,7 +51,7 @@ export default function PlanoDetalhePage() {
       setD(det);
       setCor(me.conta?.corPrimaria || '#7c3aed');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); return; }
+      if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); return; }
       setErro(err instanceof Error ? err.message : 'Erro ao carregar');
     }
   }, [router]);

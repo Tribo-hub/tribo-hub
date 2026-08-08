@@ -27,7 +27,7 @@ export default function CatalogoPage() {
 
   const carregar = useCallback(async () => {
     try { setPlanos(await api<Plano[]>('/admin/planos-catalogo')); }
-    catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); } }
+    catch (err) { if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); } }
   }, [router]);
 
   useEffect(() => { if (!getToken()) { router.replace('/login'); return; } carregar(); }, [router, carregar]);

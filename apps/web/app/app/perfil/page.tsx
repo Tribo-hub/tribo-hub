@@ -34,7 +34,7 @@ export default function PerfilPage() {
       setPreview(m.avatarUrl ?? null);
       setCor(m.conta?.corPrimaria || '#7c3aed');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearToken(); router.replace('/login'); }
+      if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); }
     }
   }, [router]);
 

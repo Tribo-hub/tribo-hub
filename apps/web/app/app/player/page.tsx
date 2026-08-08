@@ -77,7 +77,7 @@ export default function PlayerPage() {
       setTrilha(t);
       setAulaId((atual) => atual || t.modulos.flatMap((m) => m.aulas)[0]?.id || '');
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         clearToken();
         router.replace('/login');
       }
