@@ -89,6 +89,21 @@ export default function PlayerPage() {
     carregar();
   }, [router, carregar]);
 
+  // Atualiza UMA aula no estado local (evita rebuscar a trilha inteira ao marcar/avaliar).
+  const atualizarAula = useCallback((id: string, patch: Partial<Aula>) => {
+    setTrilha((t) =>
+      t
+        ? {
+            ...t,
+            modulos: t.modulos.map((m) => ({
+              ...m,
+              aulas: m.aulas.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+            })),
+          }
+        : t,
+    );
+  }, []);
+
   const aulas = useMemo(() => trilha?.modulos.flatMap((m) => m.aulas) ?? [], [trilha]);
   const aula = aulas.find((a) => a.id === aulaId) ?? null;
   const moduloAtual = trilha?.modulos.find((m) => m.aulas.some((a) => a.id === aulaId));
@@ -190,7 +205,7 @@ export default function PlayerPage() {
   async function avaliar(nota: number) {
     if (!aula) return;
     await api(`/app/aulas/${aula.id}/avaliacao`, { method: 'POST', body: JSON.stringify({ nota }) });
-    await carregar();
+    atualizarAula(aula.id, { avaliacao: nota });
   }
 
   async function alternarConclusao() {
@@ -200,8 +215,8 @@ export default function PlayerPage() {
       method: 'POST',
       body: JSON.stringify({ aulaId: aula.id, concluido: novo }),
     });
+    atualizarAula(aula.id, { concluida: novo });
     if (novo && res.certificadoEmitido) setParabens(true);
-    await carregar();
     if (novo && proxima) setAulaId(proxima.id); // ao concluir, avança; ao desmarcar, permanece
   }
 

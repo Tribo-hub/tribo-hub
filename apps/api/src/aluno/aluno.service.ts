@@ -51,24 +51,52 @@ export class AlunoService {
     const trilhas = await this.prisma.trilha.findMany({
       where,
       orderBy: [{ ordem: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],
-      include: { _count: { select: { modulos: true } } },
     });
+    if (trilhas.length === 0) return [];
+    const ids = trilhas.map((t) => t.id);
 
-    // progresso por trilha
-    return Promise.all(
-      trilhas.map(async (t) => {
-        const { total, concluidas } = await this.progressoTrilha(user.sub, t.id);
-        return {
-          id: t.id,
-          titulo: t.titulo,
-          descricao: t.descricao,
-          capaUrl: await this.assinarSeArquivo(t.capaUrl),
-          totalAulas: total,
-          aulasConcluidas: concluidas,
-          percentual: total ? Math.round((concluidas / total) * 100) : 0,
-        };
-      }),
+    // Progresso agregado em 2 queries (antes: 2 por trilha). aula->trilha + concluídas do aluno.
+    const aulas = await this.prisma.aula.findMany({
+      where: { modulo: { trilhaId: { in: ids }, deletedAt: null }, deletedAt: null },
+      select: { id: true, modulo: { select: { trilhaId: true } } },
+    });
+    const trilhaDaAula = new Map(aulas.map((a) => [a.id, a.modulo.trilhaId]));
+    const totalPorTrilha = new Map<string, number>();
+    for (const a of aulas) {
+      totalPorTrilha.set(a.modulo.trilhaId, (totalPorTrilha.get(a.modulo.trilhaId) ?? 0) + 1);
+    }
+    const feitas = aulas.length
+      ? await this.prisma.progresso.findMany({
+          where: { usuarioId: user.sub, concluido: true, aulaId: { in: aulas.map((a) => a.id) } },
+          select: { aulaId: true },
+        })
+      : [];
+    const concluidasPorTrilha = new Map<string, number>();
+    for (const p of feitas) {
+      const tid = trilhaDaAula.get(p.aulaId);
+      if (tid) concluidasPorTrilha.set(tid, (concluidasPorTrilha.get(tid) ?? 0) + 1);
+    }
+
+    // Capas assinadas em lote.
+    const assinado = await this.storage.urlsDeDownload(
+      trilhas.map((t) => t.capaUrl).filter((c): c is string => !!c && !c.startsWith('http')),
     );
+    const capa = (u: string | null): string | null =>
+      !u ? null : u.startsWith('http') ? u : (assinado.get(u) ?? null);
+
+    return trilhas.map((t) => {
+      const total = totalPorTrilha.get(t.id) ?? 0;
+      const concluidas = concluidasPorTrilha.get(t.id) ?? 0;
+      return {
+        id: t.id,
+        titulo: t.titulo,
+        descricao: t.descricao,
+        capaUrl: capa(t.capaUrl),
+        totalAulas: total,
+        aulasConcluidas: concluidas,
+        percentual: total ? Math.round((concluidas / total) * 100) : 0,
+      };
+    });
   }
 
   // Vitrine: trilhas marcadas como oferta, trancadas, exibidas para alunos de
@@ -164,60 +192,71 @@ export class AlunoService {
     }
     const diasDeAcesso = (Date.now() - inicio.getTime()) / 86_400_000;
 
-    const modulosOut = await Promise.all(
-      modulos.map(async (m) => ({
-        id: m.id,
-        titulo: m.titulo,
-        ordem: m.ordem,
-        aulas: await Promise.all(
-          m.aulas.map(async (a) => {
-            const bloqueadaDrip = (a.liberaAposDias ?? 0) > diasDeAcesso;
-            const videoUrl =
-              bloqueadaDrip || !a.videoUrl
-                ? null
-                : a.tipoVideo === 'upload'
-                  ? (await this.storage.urlDeDownload(a.videoUrl)).url
-                  : a.videoUrl;
-            return {
-              id: a.id,
-              titulo: a.titulo,
-              tipoVideo: a.tipoVideo,
-              duracaoSegundos: a.duracaoSegundos,
-              ordem: a.ordem,
-              concluida: concluidas.has(a.id),
-              avaliacao: avaliacoes.get(a.id) ?? null,
-              liberaAposDias: a.liberaAposDias,
-              bloqueadaDrip,
-              liberaEm: bloqueadaDrip
-                ? new Date(inicio!.getTime() + (a.liberaAposDias ?? 0) * 86_400_000)
-                : null,
-              videoUrl,
-              conteudoTexto: bloqueadaDrip ? null : a.conteudoTexto,
-              materialUrl: bloqueadaDrip ? null : await this.assinarSeArquivo(a.materialUrl),
-              legendaUrl: bloqueadaDrip ? null : await this.assinarSeArquivo(a.legendaUrl),
-              anexos: bloqueadaDrip ? [] : await this.assinarAnexos(a.anexos),
-            };
-          }),
-        ),
-      })),
-    );
+    // Passada 1: coleta TODOS os caminhos do Storage das aulas liberadas (vídeo upload, material,
+    // legenda, anexos) para assinar tudo de uma vez — antes era 1 request por arquivo (N×3-4).
+    const anexosDe = (raw: unknown): { nome: string; path: string }[] => {
+      if (!Array.isArray(raw)) return [];
+      const out: { nome: string; path: string }[] = [];
+      for (const it of raw) {
+        if (it && typeof it === 'object' && 'path' in it) {
+          const anexo = it as { nome?: string; path?: string };
+          if (anexo.path) out.push({ nome: anexo.nome ?? 'arquivo', path: anexo.path });
+        }
+      }
+      return out;
+    };
 
-    return { id: trilha.id, titulo: trilha.titulo, descricao: trilha.descricao, modulos: modulosOut };
-  }
-
-  // Anexos (materiais complementares): [{nome, path}] -> [{nome, url}] com URL assinada.
-  private async assinarAnexos(raw: unknown): Promise<{ nome: string; url: string }[]> {
-    if (!Array.isArray(raw)) return [];
-    const out: { nome: string; url: string }[] = [];
-    for (const it of raw) {
-      if (it && typeof it === 'object' && 'path' in it) {
-        const anexo = it as { nome?: string; path?: string };
-        if (!anexo.path) continue;
-        const url = await this.assinarSeArquivo(anexo.path);
-        if (url) out.push({ nome: anexo.nome ?? 'arquivo', url });
+    const paths = new Set<string>();
+    for (const m of modulos) {
+      for (const a of m.aulas) {
+        if ((a.liberaAposDias ?? 0) > diasDeAcesso) continue; // bloqueada por drip: nada é exposto
+        if (a.videoUrl && a.tipoVideo === 'upload' && !a.videoUrl.startsWith('http')) paths.add(a.videoUrl);
+        if (a.materialUrl && !a.materialUrl.startsWith('http')) paths.add(a.materialUrl);
+        if (a.legendaUrl && !a.legendaUrl.startsWith('http')) paths.add(a.legendaUrl);
+        for (const anexo of anexosDe(a.anexos)) if (!anexo.path.startsWith('http')) paths.add(anexo.path);
       }
     }
-    return out;
+    const assinado = await this.storage.urlsDeDownload([...paths]);
+    // path/URL -> URL final: http passa direto; caminho vira a URL já assinada (ou null se falhou).
+    const resolver = (u?: string | null): string | null =>
+      !u ? null : u.startsWith('http') ? u : (assinado.get(u) ?? null);
+
+    // Passada 2 (síncrona): monta a saída com as URLs já assinadas. MESMO shape de antes.
+    const modulosOut = modulos.map((m) => ({
+      id: m.id,
+      titulo: m.titulo,
+      ordem: m.ordem,
+      aulas: m.aulas.map((a) => {
+        const bloqueadaDrip = (a.liberaAposDias ?? 0) > diasDeAcesso;
+        const videoUrl =
+          bloqueadaDrip || !a.videoUrl ? null : a.tipoVideo === 'upload' ? resolver(a.videoUrl) : a.videoUrl;
+        return {
+          id: a.id,
+          titulo: a.titulo,
+          tipoVideo: a.tipoVideo,
+          duracaoSegundos: a.duracaoSegundos,
+          ordem: a.ordem,
+          concluida: concluidas.has(a.id),
+          avaliacao: avaliacoes.get(a.id) ?? null,
+          liberaAposDias: a.liberaAposDias,
+          bloqueadaDrip,
+          liberaEm: bloqueadaDrip
+            ? new Date(inicio!.getTime() + (a.liberaAposDias ?? 0) * 86_400_000)
+            : null,
+          videoUrl,
+          conteudoTexto: bloqueadaDrip ? null : a.conteudoTexto,
+          materialUrl: bloqueadaDrip ? null : resolver(a.materialUrl),
+          legendaUrl: bloqueadaDrip ? null : resolver(a.legendaUrl),
+          anexos: bloqueadaDrip
+            ? []
+            : anexosDe(a.anexos)
+                .map((anexo) => ({ nome: anexo.nome, url: resolver(anexo.path) }))
+                .filter((x): x is { nome: string; url: string } => !!x.url),
+        };
+      }),
+    }));
+
+    return { id: trilha.id, titulo: trilha.titulo, descricao: trilha.descricao, modulos: modulosOut };
   }
 
   // Material/legenda: se for caminho do Storage, devolve URL assinada; se já for URL, mantém.
