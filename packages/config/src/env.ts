@@ -60,6 +60,12 @@ const schema = z.object({
 
   // Parceiros / afiliados (Fase 4)
   COMISSAO_CARENCIA_DIAS: z.coerce.number().int().nonnegative().default(30),
+
+  // Domínio próprio self-service (Cloudflare for SaaS) — Fase 2 nível 2.
+  // Se ausentes, o recurso fica indisponível (endpoints respondem 503) sem quebrar nada.
+  CLOUDFLARE_API_TOKEN: z.string().optional(), // token com permissão de custom hostnames
+  CLOUDFLARE_ZONE_ID: z.string().optional(), // zona onde os custom hostnames são criados
+  CLOUDFLARE_SAAS_TARGET: z.string().optional(), // alvo do CNAME que o cliente aponta (ex.: origin.tribohubapp.com)
 });
 
 const parsed = schema.safeParse(process.env);

@@ -11,8 +11,10 @@ import { BillingModule } from './billing/billing.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { SubscriptionStatusGuard } from './common/guards/subscription-status.guard';
 import { EquipeGuard } from './common/guards/equipe.guard';
+import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { ContasModule } from './contas/contas.module';
 import { ConteudoModule } from './conteudo/conteudo.module';
+import { DominioModule } from './dominio/dominio.module';
 import { CorporativoModule } from './corporativo/corporativo.module';
 import { EmailModule } from './email/email.module';
 import { EquipeModule } from './equipe/equipe.module';
@@ -49,6 +51,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     EquipeModule,
     JornadaModule,
     PublicoModule,
+    CloudflareModule,
+    DominioModule,
   ],
   controllers: [HealthController],
   providers: [

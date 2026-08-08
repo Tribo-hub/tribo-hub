@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Clapperboard, Cable, Ticket, Calendar, ListChecks, Bot, Palette,
   Puzzle, Users, Shield, CreditCard, Settings, ExternalLink, Sun, Moon, LogOut,
-  ChevronLeft, ChevronRight, KeyRound, BarChart3, Handshake, UserCog, type LucideIcon,
+  ChevronLeft, ChevronRight, KeyRound, BarChart3, Handshake, UserCog, Globe, type LucideIcon,
 } from 'lucide-react';
 import { api, clearToken } from '../lib/api';
 import { lerMarca, salvarMarca } from '../lib/marca';
@@ -23,6 +23,7 @@ const INFO: Item[] = [
   { href: '/painel/planos', label: 'Planos de Ação', icon: ListChecks },
   { href: '/painel/agentes', label: 'Agentes IA', icon: Bot },
   { href: '/painel/marca', label: 'Marca', icon: Palette },
+  { href: '/painel/dominio', label: 'Domínio', icon: Globe },
   { href: '/painel/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/painel/recursos', label: 'Recursos', icon: Puzzle },
 ];
@@ -33,6 +34,7 @@ const CORP: Item[] = [
   { href: '/painel/planos', label: 'Planos de Ação', icon: ListChecks },
   { href: '/painel/agentes', label: 'Agentes IA', icon: Bot },
   { href: '/painel/marca', label: 'Marca', icon: Palette },
+  { href: '/painel/dominio', label: 'Domínio', icon: Globe },
   { href: '/painel/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/painel/recursos', label: 'Recursos', icon: Puzzle },
 ];

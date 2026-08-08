@@ -104,16 +104,37 @@ Operação (por cliente):
 > Domínio RAIZ (`cliente.com` sem subdomínio) não funciona por este caminho — o Pages exige
 > que o apex esteja na sua conta Cloudflare. Para apex, use o Nível 2.
 
-### Nível 2 — self-service automático (não implementado)
+### Nível 2 — self-service automático (Cloudflare for SaaS)
 
-Para o produtor cadastrar o próprio domínio no painel dele **sem você tocar na Cloudflare**
-(e suportar domínio raiz), via **Cloudflare for SaaS (Custom Hostnames)**:
+O produtor cadastra o próprio domínio no painel dele e a Cloudflare provisiona validação +
+SSL automaticamente — **sem trabalho manual da equipe**. Decisão de arquitetura: usar uma
+**ZONA DEDICADA** (ex.: `tribohubapp.com`) só para os custom hostnames, mantendo a zona
+principal (API, marketing, app) intocada.
 
-1. Habilitar Cloudflare for SaaS na zona + definir um **fallback origin** que sirva o app.
-2. **Token de API** da Cloudflare (env) + integração com a API de custom hostnames
-   (criar/checar/remover) no backend.
-3. Verificação de propriedade + SSL por registro DNS (status pendente/ativo).
-4. UI no painel do produtor (`admin_tenant`) para cadastrar o domínio e ver o status.
+**Código (pronto, gated por env):**
+- `apps/api/src/cloudflare/cloudflare.service.ts` — cria/checa/remove custom hostname (API CF).
+- `apps/api/src/dominio/` — `/painel/dominio` (GET/PUT/POST verificar/DELETE), self-service do
+  produtor, restrito ao dono (EquipeGuard). Sem env configurado → responde 503 (recurso "Em breve").
+- `apps/web/app/painel/dominio/page.tsx` + link no menu — o produtor cadastra o domínio, vê o
+  CNAME a criar e o status (pendente/ativo), com botão Verificar.
+- `infra/saas-proxy/` — Worker fallback origin (proxy do front para o Pages).
+- Env: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_SAAS_TARGET`.
 
-Preço: 100 custom hostnames grátis, US$ 0,10/hostname/mês depois (ver `MEMORY`/pesquisa).
-O mecanismo de tenant (header `X-Tenant-Slug`) permanece o mesmo — muda só o provisionamento.
+**Runbook de ativação (uma vez):**
+1. Registrar um domínio dedicado (ex.: `tribohubapp.com`) e adicioná-lo como zona na Cloudflare.
+2. Nessa zona: **SSL/TLS → Custom Hostnames → habilitar Cloudflare for SaaS**.
+3. Criar um registro **A `origin` → `192.0.2.0`** (dummy, proxied) e definir `origin.tribohubapp.com`
+   como **fallback origin** do SaaS.
+4. Publicar o Worker: em `infra/saas-proxy/wrangler.toml` trocar `tribohubapp.com` pelo domínio
+   real, então `cd infra/saas-proxy && npx wrangler deploy` (rota `*/*` na zona dedicada).
+5. Criar um **token de API** (Cloudflare → My Profile → API Tokens) com permissão
+   *Zone → SSL and Certificates → Edit* (ou *Custom Hostnames*) na zona dedicada.
+6. No Railway (serviço `tribo_hub`), setar as env: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`
+   (id da zona dedicada) e `CLOUDFLARE_SAAS_TARGET=origin.tribohubapp.com`. Deploy da API.
+7. Testar com um domínio real: no painel do produtor, cadastrar `area.<dominioteste>.com`,
+   criar o `CNAME → origin.tribohubapp.com` no DNS do domínio de teste, clicar **Verificar**
+   até ficar **Ativo**, e acessar.
+
+**Custos:** 100 custom hostnames grátis, US$ 0,10/hostname/mês depois; Worker grátis até
+100k req/dia, ~US$ 5/mês acima. O domínio dedicado (~R$40/ano). O mecanismo de tenant
+(header `X-Tenant-Slug`) é o mesmo — muda só o provisionamento.

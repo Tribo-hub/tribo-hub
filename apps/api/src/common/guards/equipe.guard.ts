@@ -8,7 +8,7 @@ import { env } from '@tribohub/config';
 // - atendente (eq='atendente'): só atendimento (matrículas/alunos/dashboard/perfil).
 // super_admin, aluno e rotas sem token passam (auth fica a cargo do JwtAuthGuard).
 // Decodifica o token por conta própria porque guards globais rodam antes do JwtAuthGuard.
-const DONO_ONLY = ['/painel/funcionarios', '/painel/assinatura'];
+const DONO_ONLY = ['/painel/funcionarios', '/painel/assinatura', '/painel/dominio'];
 const ATENDENTE_ALLOW = ['/me', '/painel/matriculas', '/painel/alunos', '/painel/alunos-ativos', '/painel/dashboard'];
 
 @Injectable()
