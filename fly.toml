@@ -1,0 +1,30 @@
+# Deploy da API TriboHub no Fly.io — região São Paulo (gru), co-localizada com o banco (Supabase sa-east-1).
+# Troque "app" por um nome único se este já existir.
+app = "tribohub-api"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Sempre 1 máquina ligada — evita cold start (que reintroduziria latência).
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

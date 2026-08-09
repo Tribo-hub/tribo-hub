@@ -1,0 +1,15 @@
+# Não enviar ao build da imagem (contexto menor + evita vazar segredos e node_modules do host)
+.git
+**/node_modules
+**/dist
+**/.next
+apps/web/out
+apps/web/.wrangler
+.env
+*.env
+*.log
+npm-debug.log*
+.DS_Store
+infra
+site
+docs
