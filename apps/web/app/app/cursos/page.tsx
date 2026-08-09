@@ -12,7 +12,7 @@ interface Me { conta?: { corPrimaria: string | null } }
 
 export default function MeusCursosPage() {
   const router = useRouter();
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [trilhas, setTrilhas] = useState<TrilhaResumo[]>([]);
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [carregando, setCarregando] = useState(true);

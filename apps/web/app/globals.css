@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Cor primária do tenant (white-label). O script no <head> (layout.tsx) sobrescreve
+   este default com a cor da marca ANTES do primeiro paint, lendo do cache por domínio. */
+:root { --cor-primaria: #7c3aed; }
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* Design system — tokens centralizados (editar aqui reflete em todo o app) */

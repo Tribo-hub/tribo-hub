@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem('tribo_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}`,
+            __html: `try{if(localStorage.getItem('tribo_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}try{var m=localStorage.getItem('tribo_marca:'+location.hostname);if(m){var c=JSON.parse(m).corPrimaria;if(c)document.documentElement.style.setProperty('--cor-primaria',c);}}catch(e){}`,
           }}
         />
       </head>

@@ -47,7 +47,7 @@ function countdown(p: PlanoCard): { txt: string; cor: 'normal' | 'alerta' | 'ok'
 export default function PlanosAlunoPage() {
   const router = useRouter();
   const [planos, setPlanos] = useState<PlanoCard[]>([]);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [carregando, setCarregando] = useState(true);
   const [filtroTrilha, setFiltroTrilha] = useState(''); // '' = todas
 

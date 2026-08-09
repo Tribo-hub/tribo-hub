@@ -15,7 +15,7 @@ interface Me {
 
 export default function PerfilPage() {
   const router = useRouter();
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');

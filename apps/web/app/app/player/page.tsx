@@ -52,7 +52,7 @@ export default function PlayerPage() {
   }, []);
 
   const [trilha, setTrilha] = useState<Trilha | null>(null);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [parabens, setParabens] = useState(false);
 
   useEffect(() => {

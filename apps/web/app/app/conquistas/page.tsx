@@ -16,7 +16,7 @@ interface Me { conta?: { corPrimaria: string | null } }
 export default function ConquistasPage() {
   const router = useRouter();
   const [r, setR] = useState<Resumo | null>(null);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {

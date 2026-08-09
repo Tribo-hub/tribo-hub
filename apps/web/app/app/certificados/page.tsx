@@ -16,7 +16,7 @@ export default function CertificadosPage() {
   const router = useRouter();
   const [certs, setCerts] = useState<Certificado[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [baixando, setBaixando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {

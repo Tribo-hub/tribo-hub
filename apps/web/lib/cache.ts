@@ -5,6 +5,7 @@
 // (do cache) e revalidar em segundo plano. É aditivo — quem não usar continua igual.
 
 import { api } from './api';
+import { aplicarCorMarca, salvarMarca } from './marca';
 
 interface Entrada {
   data: unknown;
@@ -46,6 +47,15 @@ export async function getMe<T = unknown>(): Promise<T> {
     meInflight = api('/me')
       .then((d) => {
         gravarCache('/me', d, TTL_ME);
+        // Aquece o cache da marca (por domínio) e aplica a cor na hora — mantém a
+        // --cor-primaria correta e garante zero flash no próximo carregamento.
+        try {
+          const conta = (d as { conta?: { nome?: string; corPrimaria?: string | null; logoUrl?: string | null } }).conta;
+          salvarMarca(conta);
+          aplicarCorMarca(conta?.corPrimaria);
+        } catch {
+          /* ignore */
+        }
         return d;
       })
       .finally(() => {

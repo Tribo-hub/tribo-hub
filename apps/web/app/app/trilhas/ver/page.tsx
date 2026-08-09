@@ -46,7 +46,7 @@ export default function TrilhaOverview() {
     setId(new URLSearchParams(window.location.search).get('id') ?? '');
   }, []);
   const [trilha, setTrilha] = useState<Trilha | null>(null);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [agentes, setAgentes] = useState<{ id: string; nome: string; descricao: string | null; icone: string | null; url: string }[]>([]);
   const [erro, setErro] = useState('');
 

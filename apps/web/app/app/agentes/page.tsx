@@ -17,7 +17,7 @@ interface Me { conta?: { nome: string; corPrimaria: string | null } }
 export default function AgentesAlunoPage() {
   const router = useRouter();
   const [agentes, setAgentes] = useState<Agente[]>([]);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [busca, setBusca] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);

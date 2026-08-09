@@ -38,7 +38,7 @@ export default function PlanoDetalhePage() {
   const router = useRouter();
   const [id, setId] = useState('');
   const [d, setD] = useState<Detalhe | null>(null);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [erro, setErro] = useState('');
   const [aberto, setAberto] = useState<Item | null>(null);
   const [resumo, setResumo] = useState('');

@@ -18,7 +18,7 @@ interface Me { conta?: { corPrimaria: string | null } }
 export default function AgendaAlunoPage() {
   const router = useRouter();
   const [eventos, setEventos] = useState<Evento[]>([]);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {

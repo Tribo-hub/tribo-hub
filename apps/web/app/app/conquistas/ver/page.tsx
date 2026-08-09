@@ -26,7 +26,7 @@ interface Me { conta?: { corPrimaria: string | null } }
 export default function ConquistasTrilhaPage() {
   const router = useRouter();
   const [r, setR] = useState<Detalhe | null>(null);
-  const [cor, setCor] = useState('#7c3aed');
+  const [cor, setCor] = useState('var(--cor-primaria)');
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async (trilhaId: string) => {

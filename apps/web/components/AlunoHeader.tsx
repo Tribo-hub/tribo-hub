@@ -44,7 +44,7 @@ export function AlunoHeader({ active }: { active?: Chave }) {
     router.replace('/login');
   }
 
-  const cor = me?.conta?.corPrimaria || '#7c3aed';
+  const cor = me?.conta?.corPrimaria || 'var(--cor-primaria)';
   const marca = me?.conta?.nome || 'Tribo Hub';
   const iniciais = (me?.nome || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 

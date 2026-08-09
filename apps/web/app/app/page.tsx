@@ -146,7 +146,7 @@ export default function AppHome() {
     }
   }
 
-  const cor = me?.conta?.corPrimaria || '#7c3aed';
+  const cor = me?.conta?.corPrimaria || 'var(--cor-primaria)';
   const temJornada = !!jornada && jornada.opcoes.some((o) => o.temPlanos);
 
   // hrefs (cliques direcionados)
