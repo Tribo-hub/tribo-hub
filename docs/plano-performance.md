@@ -4,6 +4,15 @@ Objetivo: eliminar o flash da marca e deixar a navegação do aluno (curso/aula)
 sem quebrar nada do que já está no ar. Execução em **5 fases**, na ordem abaixo. Cada item
 tem: **o quê**, **arquivos**, **risco**, **como validar**. Marque `[x]` ao concluir.
 
+> **STATUS (08/08/2026):** Fases **1-4 CONCLUÍDAS e no ar** (assinaturas em lote+cache; home
+> paralela + compressão; cache-first no cliente + prefetch + `/me` compartilhado; marca sem
+> flash via variável CSS pré-paint). **Fase 5 (co-localizar API+banco em SP via Fly.io)
+> ADIADA** por decisão do Lucas ("deixar no Railway por hora, revisitar com clientes
+> pagantes"). Diagnóstico da Fase 5: API em Railway **US East** e banco Supabase em
+> **São Paulo** → ~0,8s de piso por request (travessia EUA↔Brasil). Artefatos de migração
+> prontos no repo (`Dockerfile`, `fly.toml`, `docs/migracao-api-fly.md`). Antes da migração,
+> vale testar a alternativa barata: pooler session (`:5432`) em vez do de transação (`:6543`).
+
 Princípio Netflix atacado: (1) cache-first, (2) prefetch, (3) CDN de mídia, (4) menos idas ao servidor.
 
 ---
