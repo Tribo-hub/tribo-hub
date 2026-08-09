@@ -7,7 +7,8 @@ import {
   Home, GraduationCap, CalendarDays, ListChecks, Trophy, Bot, Award,
   Sun, Moon, LogOut, ChevronLeft, ChevronRight, KeyRound, type LucideIcon,
 } from 'lucide-react';
-import { api, clearToken } from '../lib/api';
+import { clearToken } from '../lib/api';
+import { getMe } from '../lib/cache';
 import { lerMarca, salvarMarca } from '../lib/marca';
 import { SinoNotificacoes } from './SinoNotificacoes';
 import { AlterarSenhaModal } from './AlterarSenhaModal';
@@ -45,7 +46,7 @@ export function AlunoSidebar({ mobileOpen = false, onClose }: { mobileOpen?: boo
       setCollapsed(localStorage.getItem('tribo_nav') === '1');
       setDark(document.documentElement.classList.contains('dark'));
     } catch { /* ignore */ }
-    api<Me>('/me').then((m) => { setMe(m); salvarMarca(m.conta); }).catch(() => {});
+    getMe<Me>().then((m) => { setMe(m); salvarMarca(m.conta); }).catch(() => {});
   }, []);
 
   function toggleNav() {

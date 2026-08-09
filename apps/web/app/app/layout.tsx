@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
-import { api } from '../../lib/api';
+import { getMe } from '../../lib/cache';
 import { lerMarca, salvarMarca } from '../../lib/marca';
 import { AlunoSidebar } from '../../components/AlunoSidebar';
 import { BloqueioInadimplencia } from '../../components/BloqueioInadimplencia';
@@ -17,7 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [bloqueado, setBloqueado] = useState(false);
 
   useEffect(() => {
-    api<Me>('/me').then((m) => { if (m.conta?.nome) setMarca(m.conta.nome); salvarMarca(m.conta); setBloqueado(!!m.bloqueado); }).catch(() => {});
+    getMe<Me>().then((m) => { if (m.conta?.nome) setMarca(m.conta.nome); salvarMarca(m.conta); setBloqueado(!!m.bloqueado); }).catch(() => {});
   }, []);
 
   // O player é imersivo (tela cheia), sem menu lateral.

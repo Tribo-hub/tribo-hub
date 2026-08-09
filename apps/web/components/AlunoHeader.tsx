@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Menu, X, Sun, Moon } from 'lucide-react';
-import { api, clearToken } from '../lib/api';
+import { clearToken } from '../lib/api';
+import { getMe } from '../lib/cache';
 import { SinoNotificacoes } from './SinoNotificacoes';
 
 interface Me {
@@ -30,7 +31,7 @@ export function AlunoHeader({ active }: { active?: Chave }) {
 
   useEffect(() => {
     try { setDark(document.documentElement.classList.contains('dark')); } catch { /* ignore */ }
-    api<Me>('/me').then(setMe).catch(() => {});
+    getMe<Me>().then(setMe).catch(() => {});
   }, []);
 
   function toggleTema() {

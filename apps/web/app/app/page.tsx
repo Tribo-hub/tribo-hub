@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../lib/api';
+import { getMe } from '../../lib/cache';
 import { sanitizeHtml } from '../../lib/sanitize';
 
 interface TrilhaResumo { id: string; titulo: string; descricao: string; capaUrl: string | null; totalAulas: number; aulasConcluidas: number; percentual: number }
@@ -49,7 +50,7 @@ export default function AppHome() {
   const carregar = useCallback(async () => {
     try {
       const [m, jor, ts, ofs] = await Promise.all([
-        api<Me>('/me'),
+        getMe<Me>(),
         api<Jornada>('/app/jornada').catch(() => null),
         api<TrilhaResumo[]>('/app/trilhas'),
         api<Oferta[]>('/app/ofertas').catch(() => []),

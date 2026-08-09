@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { getMe, gravarCache, lerCache } from '../../../lib/cache';
 import { embed } from '../../../lib/video';
 import { sanitizeHtml } from '../../../lib/sanitize';
 
@@ -55,7 +56,7 @@ export default function PlayerPage() {
   const [parabens, setParabens] = useState(false);
 
   useEffect(() => {
-    api<{ conta?: { corPrimaria: string | null } }>('/me')
+    getMe<{ conta?: { corPrimaria: string | null } }>()
       .then((m) => setCor(m.conta?.corPrimaria || '#7c3aed'))
       .catch(() => {});
   }, []);
@@ -72,9 +73,16 @@ export default function PlayerPage() {
 
   const carregar = useCallback(async () => {
     if (!trilhaId) return;
+    // Seed do cache (mesma chave da trilha/overview/prefetch): abre a aula na hora.
+    const cached = lerCache<Trilha>(`/app/trilhas/${trilhaId}`);
+    if (cached) {
+      setTrilha(cached);
+      setAulaId((atual) => atual || cached.modulos.flatMap((m) => m.aulas)[0]?.id || '');
+    }
     try {
       const t = await api<Trilha>(`/app/trilhas/${trilhaId}`);
       setTrilha(t);
+      gravarCache(`/app/trilhas/${trilhaId}`, t);
       setAulaId((atual) => atual || t.modulos.flatMap((m) => m.aulas)[0]?.id || '');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401)) {

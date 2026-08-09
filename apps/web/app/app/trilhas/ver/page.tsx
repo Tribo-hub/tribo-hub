@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../../lib/api';
+import { getMe, gravarCache, lerCache } from '../../../../lib/cache';
 import { sanitizeHtml } from '../../../../lib/sanitize';
 
 interface Aula {
@@ -51,13 +52,17 @@ export default function TrilhaOverview() {
 
   const carregar = useCallback(async () => {
     if (!id) return;
+    // Seed do cache (mesma chave do player): abre a trilha na hora se já visitada/prefetchada.
+    const cached = lerCache<Trilha>(`/app/trilhas/${id}`);
+    if (cached) setTrilha(cached);
     try {
       const [t, m, ags] = await Promise.all([
         api<Trilha>(`/app/trilhas/${id}`),
-        api<Me>('/me'),
+        getMe<Me>(),
         api<{ id: string; nome: string; descricao: string | null; icone: string | null; url: string }[]>(`/app/trilhas/${id}/agentes`),
       ]);
       setTrilha(t);
+      gravarCache(`/app/trilhas/${id}`, t);
       setCor(m.conta?.corPrimaria || '#7c3aed');
       setAgentes(ags);
     } catch (err) {

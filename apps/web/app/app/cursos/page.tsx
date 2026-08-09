@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../../lib/api';
+import { getMe, gravarCache, lerCache, prefetch } from '../../../lib/cache';
 
 interface TrilhaResumo { id: string; titulo: string; capaUrl: string | null; totalAulas: number; aulasConcluidas: number; percentual: number }
 interface Oferta { id: string; titulo: string; descricao: string; capaUrl: string | null; checkoutUrl: string | null; whatsappUrl: string | null }
@@ -17,15 +18,20 @@ export default function MeusCursosPage() {
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {
+    // Seed do cache: mostra na hora o que já foi visto; revalida em seguida.
+    const ct = lerCache<TrilhaResumo[]>('/app/trilhas');
+    const co = lerCache<Oferta[]>('/app/ofertas');
+    if (ct) { setTrilhas(ct); setCarregando(false); }
+    if (co) setOfertas(co);
     try {
       const [m, ts, ofs] = await Promise.all([
-        api<Me>('/me'),
+        getMe<Me>(),
         api<TrilhaResumo[]>('/app/trilhas'),
         api<Oferta[]>('/app/ofertas').catch(() => []),
       ]);
       setCor(m.conta?.corPrimaria || '#7c3aed');
-      setTrilhas(ts);
-      setOfertas(ofs);
+      setTrilhas(ts); gravarCache('/app/trilhas', ts);
+      setOfertas(ofs); gravarCache('/app/ofertas', ofs);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401)) { clearToken(); router.replace('/login'); }
     } finally { setCarregando(false); }
@@ -48,7 +54,7 @@ export default function MeusCursosPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {trilhas.map((t) => (
-              <Link key={t.id} href={`/app/trilhas/ver?id=${t.id}`} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition">
+              <Link key={t.id} href={`/app/trilhas/ver?id=${t.id}`} onMouseEnter={() => prefetch(`/app/trilhas/${t.id}`)} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition">
                 {t.capaUrl ? <img src={t.capaUrl} alt={t.titulo} className="aspect-[4/5] w-full object-cover" /> : <div className="aspect-[4/5]" style={{ background: `linear-gradient(to bottom right, ${cor}, #6366f1)` }} />}
                 <div className="p-4">
                   <h4 className="font-semibold">{t.titulo}</h4>
