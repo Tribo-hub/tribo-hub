@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, clearToken, getToken } from '../../lib/api';
-import { getMe } from '../../lib/cache';
+import { getMe, gravarCache, lerCache } from '../../lib/cache';
 import { sanitizeHtml } from '../../lib/sanitize';
 
 interface TrilhaResumo { id: string; titulo: string; descricao: string; capaUrl: string | null; totalAulas: number; aulasConcluidas: number; percentual: number }
@@ -48,6 +48,14 @@ export default function AppHome() {
   const reguaRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
+    // Seed do cache: Início já visitada aparece na hora; revalida em segundo plano.
+    const cj = lerCache<Jornada>('/app/jornada');
+    const ct = lerCache<TrilhaResumo[]>('/app/trilhas');
+    const co = lerCache<Oferta[]>('/app/ofertas');
+    if (cj) setJornada(cj);
+    if (ct) setTrilhas(ct);
+    if (co) setOfertas(co);
+    if (cj || ct) setCarregando(false);
     try {
       const [m, jor, ts, ofs] = await Promise.all([
         getMe<Me>(),
@@ -55,7 +63,10 @@ export default function AppHome() {
         api<TrilhaResumo[]>('/app/trilhas'),
         api<Oferta[]>('/app/ofertas').catch(() => []),
       ]);
-      setMe(m); setJornada(jor); setTrilhas(ts); setOfertas(ofs);
+      setMe(m);
+      setJornada(jor); if (jor) gravarCache('/app/jornada', jor);
+      setTrilhas(ts); gravarCache('/app/trilhas', ts);
+      setOfertas(ofs); gravarCache('/app/ofertas', ofs);
       if (m.conta?.boasVindasAtivo && m.conta.mensagemBoasVindas) {
         try {
           if (!sessionStorage.getItem('tribo_bv_visto')) { setBoasVindas(m.conta.mensagemBoasVindas); sessionStorage.setItem('tribo_bv_visto', '1'); }
@@ -92,10 +103,12 @@ export default function AppHome() {
     if (!selId) { setSelDet(null); return; }
     const p = jornada?.planos.find((x) => x.id === selId);
     if (!p || p.bloqueado) { setSelDet(null); return; }
+    const cached = lerCache<DetPlano>(`/app/planos/${selId}`);
+    if (cached) setSelDet(cached);
     let cancel = false;
-    setCarregandoDet(true);
+    setCarregandoDet(!cached);
     api<DetPlano>(`/app/planos/${selId}`)
-      .then((d) => { if (!cancel) setSelDet(d); })
+      .then((d) => { if (!cancel) { setSelDet(d); gravarCache(`/app/planos/${selId}`, d); } })
       .catch(() => { if (!cancel) setSelDet(null); })
       .finally(() => { if (!cancel) setCarregandoDet(false); });
     return () => { cancel = true; };
